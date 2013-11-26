@@ -4,6 +4,19 @@
               bundleIdentifier="com.yourcompany.opengl_spectrogram" includeBinaryInAppConfig="1"
               jucerVersion="3.1.0">
   <MAINGROUP id="jgyg2k" name="opengl_spectrogram">
+    <GROUP id="{34595AC8-CD03-06BA-955A-5F594BD83816}" name="dependencies">
+      <GROUP id="{6B7CC30B-23E1-9363-642D-D93835E19F87}" name="kiss_fft130">
+        <FILE id="PQOCAI" name="_kiss_fft_guts.h" compile="0" resource="0"
+              file="Source/dependencies/kiss_fft130/_kiss_fft_guts.h"/>
+        <FILE id="fruPWA" name="kiss_fft.c" compile="1" resource="0" file="Source/dependencies/kiss_fft130/kiss_fft.c"/>
+        <FILE id="JpmpPl" name="kiss_fft.h" compile="0" resource="0" file="Source/dependencies/kiss_fft130/kiss_fft.h"/>
+        <FILE id="s4hT1u" name="kissfft.hh" compile="0" resource="0" file="Source/dependencies/kiss_fft130/kissfft.hh"/>
+        <GROUP id="{B51A8EDA-1769-0396-1C89-24AA9A6C0C10}" name="tools">
+          <FILE id="oSRed6" name="kiss_fftr.c" compile="1" resource="0" file="Source/dependencies/kiss_fft130/tools/kiss_fftr.c"/>
+          <FILE id="IxY7Ca" name="kiss_fftr.h" compile="0" resource="0" file="Source/dependencies/kiss_fft130/tools/kiss_fftr.h"/>
+        </GROUP>
+      </GROUP>
+    </GROUP>
     <GROUP id="{FA150489-45AC-61FB-336F-0C69A4ECF447}" name="Source">
       <FILE id="W5i5WS" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>

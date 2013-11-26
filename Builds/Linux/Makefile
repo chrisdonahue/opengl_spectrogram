@@ -49,6 +49,8 @@ ifeq ($(CONFIG),Release)
 endif
 
 OBJECTS := \
+  $(OBJDIR)/kiss_fft_eaf1f82e.o \
+  $(OBJDIR)/kiss_fftr_9afb591a.o \
   $(OBJDIR)/MainComponent_a6ffb4a5.o \
   $(OBJDIR)/Main_90ebc5c2.o \
   $(OBJDIR)/juce_audio_basics_2442e4ea.o \
@@ -83,6 +85,16 @@ clean:
 strip:
 	@echo Stripping opengl_spectrogram
 	-@strip --strip-unneeded $(OUTDIR)/$(TARGET)
+
+$(OBJDIR)/kiss_fft_eaf1f82e.o: ../../Source/dependencies/kiss_fft130/kiss_fft.c
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling kiss_fft.c"
+	@$(CC) $(CFLAGS) -o "$@" -c "$<"
+
+$(OBJDIR)/kiss_fftr_9afb591a.o: ../../Source/dependencies/kiss_fft130/tools/kiss_fftr.c
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling kiss_fftr.c"
+	@$(CC) $(CFLAGS) -o "$@" -c "$<"
 
 $(OBJDIR)/MainComponent_a6ffb4a5.o: ../../Source/MainComponent.cpp
 	-@mkdir -p $(OBJDIR)
