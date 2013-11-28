@@ -18,6 +18,8 @@
       </GROUP>
     </GROUP>
     <GROUP id="{FA150489-45AC-61FB-336F-0C69A4ECF447}" name="Source">
+      <FILE id="DvVjh6" name="audio_util.cpp" compile="1" resource="0" file="Source/audio_util.cpp"/>
+      <FILE id="bj2m85" name="audio_util.h" compile="0" resource="0" file="Source/audio_util.h"/>
       <FILE id="W5i5WS" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
       <FILE id="HfQP2s" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
