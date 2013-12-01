@@ -26,14 +26,13 @@ void audio_util::calculate_fft_buffer_size(int num_frames, int n, int o, int* ff
     *fft_output_buffer_length = num_fft_calls * (*fft_num_bins);
 }
 
-void audio_util::apply_window(int n, kiss_fft_scalar* buffer, const float* window) {
-    for (int i = 0; i < n; i++) {
-        buffer[i] *= window[i];
+void audio_util::fill_window_buffer(std::string type, int n, float* window_buffer) {
+    if (type.compare("rectangle") == 0) {
+        for (int i = 0; i < n; i++) {
+            window_buffer[i] = 1.0;
+        }
     }
-}
-
-void audio_util::window(const char* type, int n, float* window_buffer) {
-    if (strcmp(type, "hann") == 0) {
+    else if (type.compare("hanning") == 0) {
         // 0.5 * (1 - cos(2*pi*n)/(N-1))
         double insideCosineValue = 0.0;
         double increment = (2 * M_PI)/(n - 1);
@@ -42,10 +41,16 @@ void audio_util::window(const char* type, int n, float* window_buffer) {
             insideCosineValue += increment;
         }
     }
-    else if (strcmp(type, "rect") == 0) {
+    else {
         for (int i = 0; i < n; i++) {
-            window_buffer[i] = 1.0;
+            window_buffer[i] = 0.0f;
         }
+    }
+}
+
+void audio_util::apply_window(int n, kiss_fft_scalar* buffer, const float* window) {
+    for (int i = 0; i < n; i++) {
+        buffer[i] *= window[i];
     }
 }
 
@@ -131,4 +136,8 @@ void audio_util::load_wav_file(std::string path, int chunk_size, int num_frames,
     afr->read(&asb, 0, num_frames, 0, false, true);
     float* chanData = asb.getSampleData(0);
     memcpy(buffer, chanData, sizeof(float) * num_frames);
+}
+
+void audio_util::load_wav_file(std::string path, wav_data* container) {
+
 }
