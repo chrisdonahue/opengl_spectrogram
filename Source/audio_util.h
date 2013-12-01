@@ -19,6 +19,19 @@
 #include <string>
 
 namespace audio_util {
+    class wav_data;
+
+    // fft helpers
+    extern void calculate_fft_buffer_size(int, int, int, int*, int*, int*);
+    extern void fill_window_buffer(std::string, int n, float*);
+    extern void apply_window(int, kiss_fft_scalar*, const float*);
+    extern void fft_real(kiss_fftr_cfg, int, const float*, int, int, const float*, kiss_fft_scalar*, kiss_fft_cpx*, double*, double*);
+
+    // wav file loading
+    extern void get_wav_file_metadata(std::string, int*, int*, double*, double*, double*);
+    extern void load_wav_file(std::string, int, int, float*);
+    extern void load_wav_file(std::string, wav_data*);
+
     // class to hold a wave file
     class wav_data {
         public:
@@ -45,17 +58,17 @@ namespace audio_util {
             fft_overlap = overlap;
             int fft_num_bins;
             int fft_output_buffer_length;
-            calculate_fft_buffer_fft_size(num_samples, fft_size, fft_overlap, &fft_num_bins, &fft_num_frames, &fft_output_buffer_length);
+            calculate_fft_buffer_size(num_samples, fft_size, fft_overlap, &fft_num_bins, &fft_num_frames, &fft_output_buffer_length);
 
             // allocate temporary buffers
-            kiss_fftr_config fft_config = kiss_fftr_alloc(n, 0/*is_inverse_fft*/, NULL, NULL);
-            kiss_fft_scalar* fft_amplitude_buffer = (kiss_fft_scalar*) malloc(fft_sizeof(kiss_fft_scalar) * fft_size);
-            float* fft_window = (float*) malloc(fft_sizeof(float) * fft_size);
+            kiss_fftr_cfg fft_config = kiss_fftr_alloc(fft_size, 0/*is_inverse_fft*/, NULL, NULL);
+            kiss_fft_scalar* fft_amplitude_buffer = (kiss_fft_scalar*) malloc(sizeof(kiss_fft_scalar) * fft_size);
+            float* fft_window = (float*) malloc(sizeof(float) * fft_size);
 
             // allocate persistent buffers
-            fft_spectra = (kiss_fft_cpx*) malloc(fft_sizeof(kiss_fft_cpx) * fft_output_buffer_length);
-            fft_magnitudes = (double*) malloc(fft_sizeof(double) * fft_output_buffer_length);
-            fft_phases = (double*) malloc(fft_sizeof(double) * fft_output_buffer_length);
+            fft_spectra = (kiss_fft_cpx*) malloc(sizeof(kiss_fft_cpx) * fft_output_buffer_length);
+            fft_magnitudes = (double*) malloc(sizeof(double) * fft_output_buffer_length);
+            fft_phases = (double*) malloc(sizeof(double) * fft_output_buffer_length);
 
             // create window
             fill_window_buffer(window, fft_size, fft_window);
@@ -74,9 +87,9 @@ namespace audio_util {
         
         void delete_fft_data() {
             if (fft_performed) {
-                free(spectra);
-                free(magnitudes);
-                free(phases);
+                free(fft_spectra);
+                free(fft_magnitudes);
+                free(fft_phases);
             }
             fft_performed = false;
         }
@@ -104,18 +117,7 @@ namespace audio_util {
         kiss_fft_scalar* fft_amplitude_buffer;
         kiss_fft_cpx* fft_spectra_buffer;
         double* fft_magnitude_buffer;
-    }
-
-    // fft helpers
-    extern void calculate_fft_buffer_size(int, int, int, int*, int*, int*);
-    extern void fill_window_buffer(std::string, int n, float*);
-    extern void apply_window(int, kiss_fft_scalar*, const float*);
-    extern void fft_real(kiss_fftr_cfg, int, const float*, int, int, const float*, kiss_fft_scalar*, kiss_fft_cpx*, double*, double*);
-
-    // wav file loading
-    extern void get_wav_file_metadata(std::string, int*, int*, double*, double*, double*);
-    extern void load_wav_file(std::string, int, int, float*);
-    extern void load_wav_file(std::string, wav_data*);
+    };
 }
 
 #endif  // AUDIO_UTIL_H_INCLUDED

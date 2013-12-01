@@ -13,10 +13,13 @@
 MainContentComponent::MainContentComponent()
 {
     setSize (500, 400);
+
+    wav_file = new audio_util::wav_data("../../../test_sound.wav");
 }
 
 MainContentComponent::~MainContentComponent()
 {
+    delete wav_file;
 }
 
 void MainContentComponent::paint (Graphics& g)
