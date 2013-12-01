@@ -1,0 +1,3 @@
+*.o
+*.swp
+Builds/Linux/build/*
