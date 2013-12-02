@@ -33,6 +33,7 @@
 */
 class JUCE_API  PluginListComponent   : public Component,
                                         public FileDragAndDropTarget,
+                                        private ListBoxModel,
                                         private ChangeListener,
                                         private ButtonListener  // (can't use Button::Listener due to idiotic VC2005 bug)
 {
@@ -52,7 +53,7 @@ public:
     /** Destructor. */
     ~PluginListComponent();
 
-    /** Changes the text in the panel's options button. */
+    /** Changes the text in the panel's button. */
     void setOptionsButtonText (const String& newText);
 
     /** Sets how many threads to simultaneously scan for plugins.
@@ -61,31 +62,41 @@ public:
     void setNumberOfThreadsForScanning (int numThreads);
 
     /** Returns the last search path stored in a given properties file for the specified format. */
-    static FileSearchPath getLastSearchPath (PropertiesFile&, AudioPluginFormat&);
+    static FileSearchPath getLastSearchPath (PropertiesFile& properties, AudioPluginFormat& format);
 
     /** Stores a search path in a properties file for the given format. */
-    static void setLastSearchPath (PropertiesFile&, AudioPluginFormat&, const FileSearchPath&);
+    static void setLastSearchPath (PropertiesFile& properties, AudioPluginFormat& format,
+                                   const FileSearchPath& newPath);
 
     /** Triggers an asynchronous scan for the given format. */
-    void scanFor (AudioPluginFormat&);
+    void scanFor (AudioPluginFormat& format);
 
     /** Returns true if there's currently a scan in progress. */
     bool isScanning() const noexcept;
+
+    //==============================================================================
+    /** @internal */
+    void resized() override;
+    /** @internal */
+    bool isInterestedInFileDrag (const StringArray&) override;
+    /** @internal */
+    void filesDropped (const StringArray&, int, int) override;
+    /** @internal */
+    int getNumRows() override;
+    /** @internal */
+    void paintListBoxItem (int row, Graphics&, int width, int height, bool rowIsSelected) override;
+    /** @internal */
+    void deleteKeyPressed (int lastRowSelected) override;
 
 private:
     //==============================================================================
     AudioPluginFormatManager& formatManager;
     KnownPluginList& list;
     File deadMansPedalFile;
-    TableListBox table;
+    ListBox listBox;
     TextButton optionsButton;
     PropertiesFile* propertiesToUse;
     int numThreads;
-
-    class TableModel;
-    friend class TableModel;
-    friend struct ContainerDeletePolicy<TableModel>;
-    ScopedPointer<TableModel> tableModel;
 
     class Scanner;
     friend class Scanner;
@@ -96,14 +107,11 @@ private:
     static void optionsMenuStaticCallback (int, PluginListComponent*);
     void optionsMenuCallback (int);
     void updateList();
+    void removeSelected();
     void showSelectedFolder();
     bool canShowSelectedFolder() const;
-    void removeSelected();
     void removeMissingPlugins();
 
-    void resized() override;
-    bool isInterestedInFileDrag (const StringArray&) override;
-    void filesDropped (const StringArray&, int, int) override;
     void buttonClicked (Button*) override;
     void changeListenerCallback (ChangeBroadcaster*) override;
 

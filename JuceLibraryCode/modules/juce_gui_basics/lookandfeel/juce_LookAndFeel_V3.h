@@ -82,9 +82,6 @@ public:
     void drawConcertinaPanelHeader (Graphics&, const Rectangle<int>& area, bool isMouseOver, bool isMouseDown,
                                     ConcertinaPanel&, Component&) override;
 
-    Path getTickShape (float height) override;
-    Path getCrossShape (float height) override;
-
     static void createTabTextLayout (const TabBarButton& button, float length, float depth, Colour colour, TextLayout&);
 
 private:

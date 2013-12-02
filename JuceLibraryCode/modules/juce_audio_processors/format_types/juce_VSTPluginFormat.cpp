@@ -1831,21 +1831,16 @@ private:
             int versionBits[32];
             int n = 0;
 
-            for (int vv = v; vv != 0; vv /= 10)
-                versionBits [n++] = vv % 10;
-
-            if (n > 4) // if the number ends up silly, it's probably encoded as hex instead of decimal..
+            while (v != 0)
             {
-                n = 0;
-
-                for (int vv = v; vv != 0; vv >>= 8)
-                    versionBits [n++] = vv & 255;
+                versionBits [n++] = v % 10;
+                v /= 10;
             }
+
+            s << 'V';
 
             while (n > 1 && versionBits [n - 1] == 0)
                 --n;
-
-            s << 'V';
 
             while (n > 0)
             {

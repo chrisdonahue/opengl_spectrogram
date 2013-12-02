@@ -874,11 +874,11 @@ private:
 
     bool parseCoordsOrSkip (String::CharPointerType& s, Point<float>& p, const bool allowUnits) const
     {
-        if (parseCoords (s, p, allowUnits))
-            return true;
+        const bool b = parseCoords (s, p, allowUnits);
+        if (! b)
+            ++s;
 
-        if (! s.isEmpty()) ++s;
-        return false;
+        return b;
     }
 
     float getCoordLength (const String& s, const float sizeForProportions) const

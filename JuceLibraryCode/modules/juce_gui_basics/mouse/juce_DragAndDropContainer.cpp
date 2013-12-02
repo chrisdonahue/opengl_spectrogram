@@ -34,13 +34,14 @@ public:
     DragImageComponent (const Image& im,
                         const var& desc,
                         Component* const sourceComponent,
-                        Component* const mouseSource,
-                        DragAndDropContainer& ddc,
-                        Point<int> offset)
+                        Component* const mouseDragSource_,
+                        DragAndDropContainer& owner_,
+                        Point<int> imageOffset_)
         : sourceDetails (desc, sourceComponent, Point<int>()),
-          image (im), owner (ddc),
-          mouseDragSource (mouseSource),
-          imageOffset (offset),
+          image (im),
+          owner (owner_),
+          mouseDragSource (mouseDragSource_),
+          imageOffset (imageOffset_),
           hasCheckedForExternalDrag (false)
     {
         setSize (im.getWidth(), im.getHeight());
@@ -188,12 +189,8 @@ public:
         return targetComponent == mouseDragSource;
     }
 
-    // (overridden to avoid beeps when dragging)
-    void inputAttemptWhenModal() override {}
-
-    DragAndDropTarget::SourceDetails sourceDetails;
-
 private:
+    DragAndDropTarget::SourceDetails sourceDetails;
     Image image;
     DragAndDropContainer& owner;
     WeakReference<Component> mouseDragSource, currentlyOverComp;
@@ -394,6 +391,8 @@ void DragAndDropContainer::startDragging (const var& sourceDescription,
         dragImageComponent = new DragImageComponent (dragImage, sourceDescription, sourceComponent,
                                                      draggingSource->getComponentUnderMouse(), *this, imageOffset);
 
+        currentDragDesc = sourceDescription;
+
         if (allowDraggingToExternalWindows)
         {
             if (! Desktop::canUseSemiTransparentWindows())
@@ -436,7 +435,7 @@ bool DragAndDropContainer::isDragAndDropActive() const
 
 var DragAndDropContainer::getCurrentDragDescription() const
 {
-    return dragImageComponent != nullptr ? dragImageComponent->sourceDetails.description
+    return dragImageComponent != nullptr ? currentDragDesc
                                          : var();
 }
 

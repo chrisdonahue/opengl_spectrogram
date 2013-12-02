@@ -291,31 +291,31 @@ public:
 
     //==============================================================================
     /** @internal */
-    int getNumRows() override;
+    int getNumRows();
     /** @internal */
-    void paintListBoxItem (int, Graphics&, int, int, bool) override;
+    void paintListBoxItem (int, Graphics&, int, int, bool);
     /** @internal */
-    Component* refreshComponentForRow (int rowNumber, bool isRowSelected, Component* existingComponentToUpdate) override;
+    Component* refreshComponentForRow (int rowNumber, bool isRowSelected, Component* existingComponentToUpdate);
     /** @internal */
-    void selectedRowsChanged (int lastRowSelected) override;
+    void selectedRowsChanged (int lastRowSelected);
     /** @internal */
-    void deleteKeyPressed (int currentSelectedRow) override;
+    void deleteKeyPressed (int currentSelectedRow);
     /** @internal */
-    void returnKeyPressed (int currentSelectedRow) override;
+    void returnKeyPressed (int currentSelectedRow);
     /** @internal */
-    void backgroundClicked() override;
+    void backgroundClicked();
     /** @internal */
-    void listWasScrolled() override;
+    void listWasScrolled();
     /** @internal */
-    void tableColumnsChanged (TableHeaderComponent*) override;
+    void tableColumnsChanged (TableHeaderComponent*);
     /** @internal */
-    void tableColumnsResized (TableHeaderComponent*) override;
+    void tableColumnsResized (TableHeaderComponent*);
     /** @internal */
-    void tableSortOrderChanged (TableHeaderComponent*) override;
+    void tableSortOrderChanged (TableHeaderComponent*);
     /** @internal */
-    void tableColumnDraggingChanged (TableHeaderComponent*, int) override;
+    void tableColumnDraggingChanged (TableHeaderComponent*, int);
     /** @internal */
-    void resized() override;
+    void resized();
 
 
 private:

@@ -900,23 +900,24 @@ void LookAndFeel_V2::drawPopupMenuUpDownArrow (Graphics& g, int width, int heigh
     g.fillPath (p);
 }
 
-void LookAndFeel_V2::drawPopupMenuItem (Graphics& g, const Rectangle<int>& area,
+void LookAndFeel_V2::drawPopupMenuItem (Graphics& g, int width, int height,
                                         const bool isSeparator, const bool isActive,
                                         const bool isHighlighted, const bool isTicked,
                                         const bool hasSubMenu, const String& text,
                                         const String& shortcutKeyText,
-                                        const Drawable* icon, const Colour* const textColourToUse)
+                                        Image* image, const Colour* const textColourToUse)
 {
+    const float halfH = height * 0.5f;
+
     if (isSeparator)
     {
-        Rectangle<int> r (area.reduced (5, 0));
-        r.removeFromTop (r.getHeight() / 2 - 1);
+        const float separatorIndent = 5.5f;
 
         g.setColour (Colour (0x33000000));
-        g.fillRect (r.removeFromTop (1));
+        g.drawLine (separatorIndent, halfH, width - separatorIndent, halfH);
 
         g.setColour (Colour (0x66ffffff));
-        g.fillRect (r.removeFromTop (1));
+        g.drawLine (separatorIndent, halfH + 1.0f, width - separatorIndent, halfH + 1.0f);
     }
     else
     {
@@ -925,12 +926,10 @@ void LookAndFeel_V2::drawPopupMenuItem (Graphics& g, const Rectangle<int>& area,
         if (textColourToUse != nullptr)
             textColour = *textColourToUse;
 
-        Rectangle<int> r (area.reduced (1));
-
         if (isHighlighted)
         {
             g.setColour (findColour (PopupMenu::highlightedBackgroundColourId));
-            g.fillRect (r);
+            g.fillRect (1, 1, width - 2, height - 2);
 
             g.setColour (findColour (PopupMenu::highlightedTextColourId));
         }
@@ -944,42 +943,33 @@ void LookAndFeel_V2::drawPopupMenuItem (Graphics& g, const Rectangle<int>& area,
 
         Font font (getPopupMenuFont());
 
-        const float maxFontHeight = area.getHeight() / 1.3f;
-
-        if (font.getHeight() > maxFontHeight)
-            font.setHeight (maxFontHeight);
+        if (font.getHeight() > height / 1.3f)
+            font.setHeight (height / 1.3f);
 
         g.setFont (font);
 
-        Rectangle<float> iconArea (r.removeFromLeft ((r.getHeight() * 5) / 4).reduced (3).toFloat());
+        const int leftBorder = (height * 5) / 4;
+        const int rightBorder = 4;
 
-        if (icon != nullptr)
+        if (image != nullptr)
         {
-            icon->drawWithin (g, iconArea, RectanglePlacement::centred | RectanglePlacement::onlyReduceInSize, 1.0f);
+            g.drawImageWithin (*image,
+                               2, 1, leftBorder - 4, height - 2,
+                               RectanglePlacement::centred | RectanglePlacement::onlyReduceInSize, false);
         }
         else if (isTicked)
         {
             const Path tick (getTickShape (1.0f));
-            g.fillPath (tick, tick.getTransformToScaleToFit (iconArea, true));
+            const float th = font.getAscent();
+            const float ty = halfH - th * 0.5f;
+
+            g.fillPath (tick, tick.getTransformToScaleToFit (2.0f, ty, (float) (leftBorder - 4),
+                                                             th, true));
         }
 
-        if (hasSubMenu)
-        {
-            const float arrowH = 0.6f * getPopupMenuFont().getAscent();
-
-            const float x = (float) r.removeFromRight ((int) arrowH).getX();
-            const float halfH = (float) r.getCentreY();
-
-            Path p;
-            p.addTriangle (x, halfH - arrowH * 0.5f,
-                           x, halfH + arrowH * 0.5f,
-                           x + arrowH * 0.6f, halfH);
-
-            g.fillPath (p);
-        }
-
-        r.removeFromRight (3);
-        g.drawFittedText (text, r, Justification::centredLeft, 1);
+        g.drawFittedText (text,
+                          leftBorder, 0, width - (leftBorder + rightBorder), height,
+                          Justification::centredLeft, 1);
 
         if (shortcutKeyText.isNotEmpty())
         {
@@ -988,7 +978,23 @@ void LookAndFeel_V2::drawPopupMenuItem (Graphics& g, const Rectangle<int>& area,
             f2.setHorizontalScale (0.95f);
             g.setFont (f2);
 
-            g.drawText (shortcutKeyText, r, Justification::centredRight, true);
+            g.drawText (shortcutKeyText,
+                        leftBorder, 0, width - (leftBorder + rightBorder + 4), height,
+                        Justification::centredRight,
+                        true);
+        }
+
+        if (hasSubMenu)
+        {
+            const float arrowH = 0.6f * getPopupMenuFont().getAscent();
+            const float x = width - height * 0.6f;
+
+            Path p;
+            p.addTriangle (x, halfH - arrowH * 0.5f,
+                           x, halfH + arrowH * 0.5f,
+                           x + arrowH * 0.6f, halfH);
+
+            g.fillPath (p);
         }
     }
 }
