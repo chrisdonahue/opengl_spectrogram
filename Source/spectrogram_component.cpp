@@ -38,13 +38,13 @@ spectrogram_component::spectrogram_component ()
     fft_size_selector->addItem ("128", 1);
     fft_size_selector->addItem ("256", 2);
     fft_size_selector->addItem ("512", 3);
-    fft_size_selector->addItem ("1,024", 4);
-    fft_size_selector->addItem ("2,048", 5);
-    fft_size_selector->addItem ("4,096", 6);
-    fft_size_selector->addItem ("8,192", 7);
-    fft_size_selector->addItem ("16,384", 8);
-    fft_size_selector->addItem ("32,768", 9);
-    fft_size_selector->addItem ("65,536", 10);
+    fft_size_selector->addItem ("1024", 4);
+    fft_size_selector->addItem ("2048", 5);
+    fft_size_selector->addItem ("4096", 6);
+    fft_size_selector->addItem ("8192", 7);
+    fft_size_selector->addItem ("16384", 8);
+    fft_size_selector->addItem ("32768", 9);
+    fft_size_selector->addItem ("65536", 10);
     fft_size_selector->addListener (this);
 
     addAndMakeVisible (fft_overlap_slider = new Slider ("fft overlap controller"));
@@ -96,8 +96,8 @@ spectrogram_component::spectrogram_component ()
 
 
     //[UserPreSize]
-    fft_size_selector->setSelectId(4);
-    fft_window_selector->setSelectId(1);
+    fft_size_selector->setSelectedId(4);
+    fft_window_selector->setSelectedId(1);
     //[/UserPreSize]
 
     setSize (600, 600);
@@ -105,7 +105,9 @@ spectrogram_component::spectrogram_component ()
 
     //[Constructor] You can add your own custom stuff here..
     wav_file = new audio_util::wav_data("../../../test_sound.wav");
-    wav_file->perform_fft();
+    compute_fft();
+    fft_values_changed = false;
+    startTimer(5000);
     //[/Constructor]
 }
 
@@ -124,6 +126,7 @@ spectrogram_component::~spectrogram_component()
 
 
     //[Destructor]. You can add your own custom destruction code here..
+    delete wav_file;
     //[/Destructor]
 }
 
@@ -160,11 +163,13 @@ void spectrogram_component::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
     if (comboBoxThatHasChanged == fft_size_selector)
     {
         //[UserComboBoxCode_fft_size_selector] -- add your combo box handling code here..
+        fft_values_changed = true;
         //[/UserComboBoxCode_fft_size_selector]
     }
     else if (comboBoxThatHasChanged == fft_window_selector)
     {
         //[UserComboBoxCode_fft_window_selector] -- add your combo box handling code here..
+        fft_values_changed = true;
         //[/UserComboBoxCode_fft_window_selector]
     }
 
@@ -180,6 +185,7 @@ void spectrogram_component::sliderValueChanged (Slider* sliderThatWasMoved)
     if (sliderThatWasMoved == fft_overlap_slider)
     {
         //[UserSliderCode_fft_overlap_slider] -- add your slider handling code here..
+        fft_values_changed = true;
         //[/UserSliderCode_fft_overlap_slider]
     }
 
@@ -192,9 +198,9 @@ void spectrogram_component::sliderValueChanged (Slider* sliderThatWasMoved)
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
 void spectrogram_component::compute_fft() {
     // get component values
-    const String& fft_size_string = fft_size_slider->getText();
+    const String& fft_size_string = fft_size_selector->getText();
     double fft_overlap_slider_value = fft_overlap_slider->getValue();
-    const String& fft_window_string = fft_window_slider->getText();
+    const String& fft_window_string = fft_window_selector->getText();
     
     // interpret component values
     int fft_size = fft_size_string.getIntValue();
@@ -202,7 +208,15 @@ void spectrogram_component::compute_fft() {
     std::string fft_window = fft_window_string.toStdString();
     
     // re-compute fft
+    std::cerr << "Recomputing FFT with size: " << fft_size << ", overlap: " << fft_overlap << ", and window: " << fft_window << std::endl;
     wav_file->perform_fft(fft_size, fft_overlap, fft_window);
+}
+
+void spectrogram_component::timerCallback() {
+    if (fft_values_changed) {
+        compute_fft();
+        fft_values_changed = false;
+    }
 }
 //[/MiscUserCode]
 
