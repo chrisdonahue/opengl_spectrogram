@@ -91,8 +91,8 @@ spectrogram_component::spectrogram_component ()
     fft_window_label->setColour (TextEditor::textColourId, Colours::black);
     fft_window_label->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
-    addAndMakeVisible (openGL_component = new Component());
-    openGL_component->setName ("openGL component");
+    addAndMakeVisible (open_gl_gui_component = new open_gl_component());
+    open_gl_gui_component->setName ("openGL component");
 
 
     //[UserPreSize]
@@ -130,7 +130,7 @@ spectrogram_component::~spectrogram_component()
     fft_size_label = nullptr;
     fft_overlap_label = nullptr;
     fft_window_label = nullptr;
-    openGL_component = nullptr;
+    open_gl_gui_component = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -158,7 +158,7 @@ void spectrogram_component::resized()
     fft_size_label->setBounds (20, 10, 160, 30);
     fft_overlap_label->setBounds (220, 10, 160, 30);
     fft_window_label->setBounds (420, 10, 160, 30);
-    openGL_component->setBounds (20, 90, 560, 490);
+    open_gl_gui_component->setBounds (20, 90, 560, 490);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -278,8 +278,8 @@ BEGIN_JUCER_METADATA
          edTextCol="ff000000" edBkgCol="0" labelText="FFT window" editableSingleClick="0"
          editableDoubleClick="0" focusDiscardsChanges="0" fontname="Default font"
          fontsize="25" bold="0" italic="0" justification="36"/>
-  <GENERICCOMPONENT name="openGL component" id="a0e9e5de66c56148" memberName="openGL_component"
-                    virtualName="" explicitFocusOrder="0" pos="20 90 560 490" class="Component"
+  <GENERICCOMPONENT name="openGL component" id="a0e9e5de66c56148" memberName="open_gl_gui_component"
+                    virtualName="" explicitFocusOrder="0" pos="20 90 560 490" class="open_gl_component"
                     params=""/>
 </JUCER_COMPONENT>
 

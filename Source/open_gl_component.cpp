@@ -53,6 +53,11 @@ void open_gl_component::mouseWheelMove (const MouseEvent&, const MouseWheelDetai
     //sizeSlider.setValue (sizeSlider.getValue() + d.deltaY);
 }
 
+void open_gl_component::mouseMagnify (const MouseEvent&, float magnifyAmmount)
+{
+    //sizeSlider.setValue (sizeSlider.getValue() + magnifyAmmount - 1.0f);
+}
+
 void open_gl_component::newOpenGLContextCreated() {
 }
 
@@ -60,7 +65,7 @@ void open_gl_component::renderOpenGL() {
     jassert (OpenGLHelpers::isContextActive());
 
     const float desktopScale = (float) open_gl_context.getRenderingScale();
-    OpenGLHelpers::clear (Colours::black);
+    OpenGLHelpers::clear (Colours::red);
 
 	glPushMatrix();
 		// White side - BACK

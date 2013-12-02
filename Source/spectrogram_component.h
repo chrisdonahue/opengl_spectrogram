@@ -80,7 +80,7 @@ private:
     ScopedPointer<Label> fft_size_label;
     ScopedPointer<Label> fft_overlap_label;
     ScopedPointer<Label> fft_window_label;
-    ScopedPointer<Component> openGL_component;
+    ScopedPointer<open_gl_component> open_gl_gui_component;
 
 
     //==============================================================================
