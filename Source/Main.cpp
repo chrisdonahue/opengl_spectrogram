@@ -61,11 +61,11 @@ public:
     class MainWindow    : public DocumentWindow
     {
     public:
-        MainWindow()  : DocumentWindow ("MainWindow",
-                                        Colours::lightgrey,
+        MainWindow()  : DocumentWindow ("3D Spectrogram",
+                                        Colours::black,
                                         DocumentWindow::allButtons)
         {
-            setContentOwned (new MainContentComponent(), true);
+            setContentOwned (new spectrogram_component(), true);
 
             centreWithSize (getWidth(), getHeight());
             setVisible (true);
