@@ -18,6 +18,10 @@
       </GROUP>
     </GROUP>
     <GROUP id="{FA150489-45AC-61FB-336F-0C69A4ECF447}" name="Source">
+      <FILE id="UGcvqR" name="open_gl_component.cpp" compile="1" resource="0"
+            file="Source/open_gl_component.cpp"/>
+      <FILE id="lMYXvU" name="open_gl_component.h" compile="0" resource="0"
+            file="Source/open_gl_component.h"/>
       <FILE id="N0mXBf" name="spectrogram_component.cpp" compile="1" resource="0"
             file="Source/spectrogram_component.cpp"/>
       <FILE id="g4Z0YC" name="spectrogram_component.h" compile="0" resource="0"

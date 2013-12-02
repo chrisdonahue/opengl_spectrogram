@@ -13,9 +13,12 @@
 
 #define LOAD_WAV_BUFFER_SIZE 512
 
+#define _USE_MATH_DEFINES
+
 #include "JuceHeader.h"
 #include "dependencies/kiss_fft130/tools/kiss_fftr.h"
 
+#include <cmath>
 #include <string>
 
 namespace audio_util {

@@ -91,8 +91,8 @@ spectrogram_component::spectrogram_component ()
     fft_window_label->setColour (TextEditor::textColourId, Colours::black);
     fft_window_label->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
-    addAndMakeVisible (openGL_component = new Component());
-    openGL_component->setName ("openGL component");
+    addAndMakeVisible (open_gl_gui_component = new open_gl_component());
+    open_gl_gui_component->setName ("openGL component");
 
 
     //[UserPreSize]
@@ -104,8 +104,16 @@ spectrogram_component::spectrogram_component ()
 
 
     //[Constructor] You can add your own custom stuff here..
-    wav_file = new audio_util::wav_data("../../../test_sound.wav");
+	// load wav file
+	wav_file = nullptr;
+#ifdef _WIN32
+    set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
+#else
+    set_wav_file("../../../test_sound.wav");
+#endif
     compute_fft();
+
+	// start timer to recompute FFT
     fft_values_changed = false;
     startTimer(5000);
     //[/Constructor]
@@ -122,7 +130,7 @@ spectrogram_component::~spectrogram_component()
     fft_size_label = nullptr;
     fft_overlap_label = nullptr;
     fft_window_label = nullptr;
-    openGL_component = nullptr;
+    open_gl_gui_component = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -150,7 +158,7 @@ void spectrogram_component::resized()
     fft_size_label->setBounds (20, 10, 160, 30);
     fft_overlap_label->setBounds (220, 10, 160, 30);
     fft_window_label->setBounds (420, 10, 160, 30);
-    openGL_component->setBounds (20, 90, 560, 490);
+    open_gl_gui_component->setBounds (20, 90, 560, 490);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -196,17 +204,24 @@ void spectrogram_component::sliderValueChanged (Slider* sliderThatWasMoved)
 
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
+void spectrogram_component::set_wav_file(std::string file_path) {
+	if (wav_file != nullptr) {
+		delete wav_file;
+	}
+	wav_file = new audio_util::wav_data(file_path);
+}
+
 void spectrogram_component::compute_fft() {
     // get component values
     const String& fft_size_string = fft_size_selector->getText();
     double fft_overlap_slider_value = fft_overlap_slider->getValue();
     const String& fft_window_string = fft_window_selector->getText();
-    
+
     // interpret component values
     int fft_size = fft_size_string.getIntValue();
     int fft_overlap = (int) (double(fft_size) * fft_overlap_slider_value);
     std::string fft_window = fft_window_string.toStdString();
-    
+
     // re-compute fft
     std::cerr << "Recomputing FFT with size: " << fft_size << ", overlap: " << fft_overlap << ", and window: " << fft_window << std::endl;
     wav_file->perform_fft(fft_size, fft_overlap, fft_window);

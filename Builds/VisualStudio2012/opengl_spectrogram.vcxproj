@@ -135,6 +135,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\Source\dependencies\kiss_fft130\kiss_fft.c"/>
     <ClCompile Include="..\..\Source\dependencies\kiss_fft130\tools\kiss_fftr.c"/>
+    <ClCompile Include="..\..\Source\open_gl_component.cpp"/>
     <ClCompile Include="..\..\Source\spectrogram_component.cpp"/>
     <ClCompile Include="..\..\Source\audio_util.cpp"/>
     <ClCompile Include="..\..\Source\Main.cpp"/>
@@ -1190,6 +1191,7 @@
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\kiss_fft.h"/>
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\kissfft.hh"/>
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\tools\kiss_fftr.h"/>
+    <ClInclude Include="..\..\Source\open_gl_component.h"/>
     <ClInclude Include="..\..\Source\spectrogram_component.h"/>
     <ClInclude Include="..\..\Source\audio_util.h"/>
     <ClInclude Include="..\..\JuceLibraryCode\modules\juce_audio_basics\buffers\juce_AudioDataConverters.h"/>

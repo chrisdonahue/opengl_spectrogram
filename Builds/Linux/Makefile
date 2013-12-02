@@ -51,6 +51,7 @@ endif
 OBJECTS := \
   $(OBJDIR)/kiss_fft_eaf1f82e.o \
   $(OBJDIR)/kiss_fftr_9afb591a.o \
+  $(OBJDIR)/open_gl_component_58997379.o \
   $(OBJDIR)/spectrogram_component_d98db4ac.o \
   $(OBJDIR)/audio_util_b9256eb4.o \
   $(OBJDIR)/Main_90ebc5c2.o \
@@ -94,6 +95,11 @@ $(OBJDIR)/kiss_fftr_9afb591a.o: ../../Source/dependencies/kiss_fft130/tools/kiss
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling kiss_fftr.c"
 	@$(CC) $(CFLAGS) -o "$@" -c "$<"
+
+$(OBJDIR)/open_gl_component_58997379.o: ../../Source/open_gl_component.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling open_gl_component.cpp"
+	@$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
 
 $(OBJDIR)/spectrogram_component_d98db4ac.o: ../../Source/spectrogram_component.cpp
 	-@mkdir -p $(OBJDIR)

@@ -23,6 +23,7 @@
 //[Headers]     -- You can add your own extra header files here --
 #include "JuceHeader.h"
 #include "audio_util.h"
+#include "open_gl_component.h"
 
 #include <stdlib.h>
 //[/Headers]
@@ -39,8 +40,8 @@
 */
 class spectrogram_component  : public Component,
                                public ComboBoxListener,
-                               public SliderListener,
-                               public Timer
+							   public Timer,
+                               public SliderListener
 {
 public:
     //==============================================================================
@@ -49,6 +50,7 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
+	void set_wav_file(std::string);
     void compute_fft();
 
     // JUCE callbacks
@@ -64,7 +66,10 @@ public:
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
+	// wav file
     audio_util::wav_data* wav_file;
+
+	// timer trigger
     bool fft_values_changed;
     //[/UserVariables]
 
@@ -75,7 +80,7 @@ private:
     ScopedPointer<Label> fft_size_label;
     ScopedPointer<Label> fft_overlap_label;
     ScopedPointer<Label> fft_window_label;
-    ScopedPointer<Component> openGL_component;
+    ScopedPointer<open_gl_component> open_gl_gui_component;
 
 
     //==============================================================================
