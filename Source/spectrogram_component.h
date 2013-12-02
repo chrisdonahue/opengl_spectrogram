@@ -51,6 +51,7 @@ public:
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
 	void set_wav_file(std::string);
+    audio_util::wav_data* get_wav_file();
     void compute_fft();
 
     // JUCE callbacks

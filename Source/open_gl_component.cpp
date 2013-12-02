@@ -65,8 +65,16 @@ void open_gl_component::renderOpenGL() {
     jassert (OpenGLHelpers::isContextActive());
 
     const float desktopScale = (float) open_gl_context.getRenderingScale();
-    OpenGLHelpers::clear (Colours::red);
+    OpenGLHelpers::clear (Colours::black);
 
+    glBegin(GL_LINE_STRIP);
+        glVertex2f(0.0f, 0.0f);
+        for (float x = 1.0f; x < 100.0f; x += 1.0f)
+            glVertex2f(x, x*x);
+        glVertex2f(100.0f, 0.0f);
+    glEnd(); 
+
+    /*
 	glPushMatrix();
 		// White side - BACK
 		glBegin(GL_POLYGON);
@@ -113,6 +121,7 @@ void open_gl_component::renderOpenGL() {
 		glVertex3f( -0.5, -0.5, -0.5 );
 		glEnd();
 	glPopMatrix();
+    */
 
 	/*
 	glPushMatrix();

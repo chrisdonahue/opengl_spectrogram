@@ -18,6 +18,7 @@
 #include "JuceHeader.h"
 #include "dependencies/kiss_fft130/tools/kiss_fftr.h"
 
+#include <assert.h>
 #include <cmath>
 #include <string>
 
@@ -95,6 +96,23 @@ namespace audio_util {
                 free(fft_phases);
             }
             fft_performed = false;
+        }
+
+        int get_num_bins_per_frame() {
+            assert(fft_performed);
+            return (fft_size / 2 + 1);
+        }
+
+        double* get_fft_magnitudes_frame(int i) {
+            assert(fft_performed);
+            assert(i < fft_num_frames);
+            return fft_magnitudes + (get_num_bins_per_frame() * i);
+        }
+
+        double* get_fft_phases_frame(int i) {
+            assert(fft_performed);
+            assert(i < fft_num_frames);
+            return fft_phases + (get_num_bins_per_frame() * i);
         }
 
         // source file path for this wav file

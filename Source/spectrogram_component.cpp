@@ -211,6 +211,10 @@ void spectrogram_component::set_wav_file(std::string file_path) {
 	wav_file = new audio_util::wav_data(file_path);
 }
 
+audio_util::wav_data* spectrogram_component::get_wav_file() {
+    return wav_file;
+}
+
 void spectrogram_component::compute_fft() {
     // get component values
     const String& fft_size_string = fft_size_selector->getText();
