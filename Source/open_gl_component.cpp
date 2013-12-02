@@ -29,22 +29,6 @@ open_gl_component::~open_gl_component()
 
 void open_gl_component::paint (Graphics& g)
 {
-    /* This demo code just fills the component's background and
-       draws some placeholder text to get you started.
-
-       You should replace everything in this method with your own
-       drawing code..
-    */
-
-    g.fillAll (Colours::white);   // clear the background
-
-    g.setColour (Colours::grey);
-    g.drawRect (getLocalBounds(), 1);   // draw an outline around the component
-
-    g.setColour (Colours::lightblue);
-    g.setFont (14.0f);
-    g.drawText ("open_gl_component", getLocalBounds(),
-                Justification::centred, true);   // draw some placeholder text
 }
 
 void open_gl_component::resized()
@@ -54,6 +38,20 @@ void open_gl_component::resized()
 
 }
 
+void open_gl_component::mouseDown (const MouseEvent& e)
+{
+    //demo.draggableOrientation.mouseDown (e.getPosition());
+}
+
+void open_gl_component::mouseDrag (const MouseEvent& e)
+{
+    //demo.draggableOrientation.mouseDrag (e.getPosition());
+}
+
+void open_gl_component::mouseWheelMove (const MouseEvent&, const MouseWheelDetails& d)
+{
+    //sizeSlider.setValue (sizeSlider.getValue() + d.deltaY);
+}
 
 void open_gl_component::newOpenGLContextCreated() {
 }
@@ -62,7 +60,63 @@ void open_gl_component::renderOpenGL() {
     jassert (OpenGLHelpers::isContextActive());
 
     const float desktopScale = (float) open_gl_context.getRenderingScale();
-    OpenGLHelpers::clear (Colours::lightblue);
+    OpenGLHelpers::clear (Colours::black);
+
+	glPushMatrix();
+		// White side - BACK
+		glBegin(GL_POLYGON);
+		glColor3f(   1.0,  1.0, 1.0 );
+		glVertex3f(  0.5, -0.5, 0.5 );
+		glVertex3f(  0.5,  0.5, 0.5 );
+		glVertex3f( -0.5,  0.5, 0.5 );
+		glVertex3f( -0.5, -0.5, 0.5 );
+		glEnd();
+ 
+		// Purple side - RIGHT
+		glBegin(GL_POLYGON);
+		glColor3f(  1.0,  0.0,  1.0 );
+		glVertex3f( 0.5, -0.5, -0.5 );
+		glVertex3f( 0.5,  0.5, -0.5 );
+		glVertex3f( 0.5,  0.5,  0.5 );
+		glVertex3f( 0.5, -0.5,  0.5 );
+		glEnd();
+ 
+		// Green side - LEFT
+		glBegin(GL_POLYGON);
+		glColor3f(   0.0,  1.0,  0.0 );
+		glVertex3f( -0.5, -0.5,  0.5 );
+		glVertex3f( -0.5,  0.5,  0.5 );
+		glVertex3f( -0.5,  0.5, -0.5 );
+		glVertex3f( -0.5, -0.5, -0.5 );
+		glEnd();
+ 
+		// Blue side - TOP
+		glBegin(GL_POLYGON);
+		glColor3f(   0.0,  0.0,  1.0 );
+		glVertex3f(  0.5,  0.5,  0.5 );
+		glVertex3f(  0.5,  0.5, -0.5 );
+		glVertex3f( -0.5,  0.5, -0.5 );
+		glVertex3f( -0.5,  0.5,  0.5 );
+		glEnd();
+ 
+		// Red side - BOTTOM
+		glBegin(GL_POLYGON);
+		glColor3f(   1.0,  0.0,  0.0 );
+		glVertex3f(  0.5, -0.5, -0.5 );
+		glVertex3f(  0.5, -0.5,  0.5 );
+		glVertex3f( -0.5, -0.5,  0.5 );
+		glVertex3f( -0.5, -0.5, -0.5 );
+		glEnd();
+	glPopMatrix();
+
+	/*
+	glPushMatrix();
+		glBegin(GL_LINES); 
+			glVertex3f( -2, -2, 0.6);       // P1
+			glVertex3f( -2,  2, 0.6);       // P2
+		glEnd();
+	glPopMatrix();
+	*/
 }
 
 void open_gl_component::openGLContextClosing() {

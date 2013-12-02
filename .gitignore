@@ -1,3 +1,6 @@
 *.o
 *.swp
 Builds/Linux/build/*
+Builds/VisualStudio2012/Debug/*
+Builds/VisualStudio2012/opengl_spectrogram.sdf
+Builds/VisualStudio2012/opengl_spectrogram.v11.suo

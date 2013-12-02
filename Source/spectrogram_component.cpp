@@ -91,8 +91,8 @@ spectrogram_component::spectrogram_component ()
     fft_window_label->setColour (TextEditor::textColourId, Colours::black);
     fft_window_label->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
-    addAndMakeVisible (open_gl_gui_component = new open_gl_component());
-    open_gl_gui_component->setName ("openGL component");
+    addAndMakeVisible (openGL_component = new Component());
+    openGL_component->setName ("openGL component");
 
 
     //[UserPreSize]
@@ -130,7 +130,7 @@ spectrogram_component::~spectrogram_component()
     fft_size_label = nullptr;
     fft_overlap_label = nullptr;
     fft_window_label = nullptr;
-    open_gl_gui_component = nullptr;
+    openGL_component = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -158,7 +158,7 @@ void spectrogram_component::resized()
     fft_size_label->setBounds (20, 10, 160, 30);
     fft_overlap_label->setBounds (220, 10, 160, 30);
     fft_window_label->setBounds (420, 10, 160, 30);
-    open_gl_gui_component->setBounds (20, 90, 560, 490);
+    openGL_component->setBounds (20, 90, 560, 490);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -252,7 +252,7 @@ BEGIN_JUCER_METADATA
   <BACKGROUND backgroundColour="ff000000"/>
   <COMBOBOX name="fft size controller" id="8b5f726db5377900" memberName="fft_size_selector"
             virtualName="" explicitFocusOrder="0" pos="20 50 160 24" tooltip="size of FFT"
-            editable="0" layout="33" items="128&#10;256&#10;512&#10;1,024&#10;2,048&#10;4,096&#10;8,192&#10;16,384&#10;32,768&#10;65,536"
+            editable="0" layout="33" items="128&#10;256&#10;512&#10;1024&#10;2048&#10;4096&#10;8192&#10;16384&#10;32768&#10;65536"
             textWhenNonSelected="" textWhenNoItems=""/>
   <SLIDER name="fft overlap controller" id="f26bf579df409470" memberName="fft_overlap_slider"
           virtualName="" explicitFocusOrder="0" pos="220 50 160 24" tooltip="overlap of FFT"

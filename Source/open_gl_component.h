@@ -17,6 +17,7 @@
 /*
 */
 class open_gl_component    : public Component,
+							 public MouseListener,
 							 private OpenGLRenderer
 {
 public:
@@ -26,6 +27,12 @@ public:
     void paint (Graphics&);
     void resized();
 
+	// mouse listeners
+	void mouseDown (const MouseEvent& e);
+	void mouseDrag (const MouseEvent& e);
+	void mouseWheelMove (const MouseEvent&, const MouseWheelDetails& d);
+
+	// open GL methods
 	void newOpenGLContextCreated();
 	void renderOpenGL();
 	void openGLContextClosing();
