@@ -1,0 +1,19 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2012
+Project("{24DF93E2-3C32-432C-B2B1-8D83813D5625}") = "opengl_spectrogram", "opengl_spectrogram.vcxproj", "{AC80F59D-3798-360F-F136-ECCB2B6C0C68}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AC80F59D-3798-360F-F136-ECCB2B6C0C68}.Debug|Win32.ActiveCfg = Debug|Win32
+		{AC80F59D-3798-360F-F136-ECCB2B6C0C68}.Debug|Win32.Build.0 = Debug|Win32
+		{AC80F59D-3798-360F-F136-ECCB2B6C0C68}.Release|Win32.ActiveCfg = Release|Win32
+		{AC80F59D-3798-360F-F136-ECCB2B6C0C68}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
