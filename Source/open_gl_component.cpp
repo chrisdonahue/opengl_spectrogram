@@ -23,7 +23,7 @@ open_gl_component::open_gl_component()
 	open_gl_context.setContinuousRepainting(true);
 
 	// start UI changed timer
-    startTimer(5000);
+    startTimer(1000);
 }
 
 open_gl_component::~open_gl_component()
@@ -80,7 +80,7 @@ void open_gl_component::renderOpenGL() {
 
     glBegin(GL_LINE_STRIP);
 		for (int i = 0; i < num_bins; i++) {
-			glVertex2f((float) i, magnitudes[i]);
+			glVertex2f(float(i)/float(num_bins), magnitudes[i]);
 		}
     glEnd(); 
 
