@@ -146,6 +146,7 @@ void open_gl_component::openGLContextClosing() {
 }
 
 void open_gl_component::timerCallback() {
+	const ScopedLock sl(wav_file_lock);
 	if (wav_file == nullptr)
 		return;
 
@@ -166,6 +167,7 @@ void open_gl_component::timerCallback() {
 }
 
 void open_gl_component::set_wav_file(std::string file_path) {
+	const ScopedLock sl(wav_file_lock);
 	if (wav_file != nullptr) {
 		delete wav_file;
 	}

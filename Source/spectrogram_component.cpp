@@ -29,10 +29,6 @@
 //==============================================================================
 spectrogram_component::spectrogram_component ()
 {
-	fft_size = 1024;
-	fft_overlap = 0;
-	fft_window_type = "rectangle";
-
     addAndMakeVisible (fft_size_selector = new ComboBox ("fft size controller"));
     fft_size_selector->setTooltip ("size of FFT");
     fft_size_selector->setEditableText (false);
@@ -102,6 +98,9 @@ spectrogram_component::spectrogram_component ()
     //[UserPreSize]
     fft_size_selector->setSelectedId(4);
     fft_window_selector->setSelectedId(1);
+	comboBoxChanged(fft_size_selector);
+	sliderValueChanged(fft_overlap_slider);
+	comboBoxChanged(fft_window_selector);
     //[/UserPreSize]
 
     setSize (600, 600);
@@ -128,7 +127,6 @@ spectrogram_component::~spectrogram_component()
     fft_overlap_label = nullptr;
     fft_window_label = nullptr;
     open_gl_gui_component = nullptr;
-
 
     //[Destructor]. You can add your own custom destruction code here..
     //[/Destructor]

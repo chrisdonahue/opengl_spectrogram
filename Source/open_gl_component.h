@@ -57,6 +57,7 @@ private:
 	OpenGLContext open_gl_context;
 
 	// wav file
+	CriticalSection wav_file_lock;
     audio_util::wav_data* wav_file;
 
 	// old timer state
