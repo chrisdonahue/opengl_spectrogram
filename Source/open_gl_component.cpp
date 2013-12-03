@@ -16,18 +16,9 @@ open_gl_component::open_gl_component()
 {
 	// load wav file
 	wav_file = nullptr;
-#ifdef _WIN32
-    //set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
-	set_wav_file("D:\\My Code\\opengl_spectrogram\\test_sound.wav");
-#else
-    set_wav_file("../../../test_sound.wav");
-#endif
-
-	// compute initial fft
-	compute_fft(1024, 0, "rectangle");
-
-    // In your constructor, you should add any child components, and
-    // initialise any special settings that your component needs.
+	
+	// find parent
+	parent = ((spectrogram_component*) getParentComponent());
 
 	// openGL init
 	open_gl_context.setRenderer(this);
@@ -155,8 +146,10 @@ void open_gl_component::openGLContextClosing() {
 }
 
 void open_gl_component::timerCallback() {
+	if (wav_file == nullptr)
+		return;
+
 	// retrieve values from UI
-	spectrogram_component* parent = ((spectrogram_component*) getParentComponent());
 	int current_fft_size = parent->get_fft_size();
 	int current_fft_overlap = parent->get_fft_overlap();
 	std::string current_fft_window_type = parent->get_fft_window_type();
@@ -168,7 +161,7 @@ void open_gl_component::timerCallback() {
 			current_fft_window_type.compare(last_fft_window_type) != 0
 		)
 	{
-        compute_fft(current_fft_size, current_fft_overlap, current_fft_window_type);
+        compute_fft();
     }
 }
 
@@ -177,9 +170,20 @@ void open_gl_component::set_wav_file(std::string file_path) {
 		delete wav_file;
 	}
 	wav_file = new audio_util::wav_data(file_path);
+
+	// compute initial fft
+	compute_fft();
 }
 
-void open_gl_component::compute_fft(int fft_size, int fft_overlap, std::string fft_window_type) {
+void open_gl_component::compute_fft() {
+	if (wav_file == nullptr)
+		return;
+
+	// retrieve values from UI
+	int fft_size = parent->get_fft_size();
+	int fft_overlap = parent->get_fft_overlap();
+	std::string fft_window_type = parent->get_fft_window_type();
+
     // re-compute fft
     std::cerr << "Recomputing FFT with size: " << fft_size << ", overlap: " << fft_overlap << ", and window: " << fft_window_type << std::endl;
     wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);

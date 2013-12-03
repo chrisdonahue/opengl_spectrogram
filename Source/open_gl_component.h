@@ -15,6 +15,8 @@
 #include "audio_util.h"
 #include "spectrogram_component.h"
 
+class spectrogram_component;
+
 //==============================================================================
 /*
 */
@@ -45,9 +47,12 @@ public:
 	
 	// wav file methods
 	void set_wav_file(std::string file_path);
-	void compute_fft(int, int, std::string);
+	void compute_fft();
 	
 private:
+	// parent
+	spectrogram_component* parent;
+
 	// openGL state
 	OpenGLContext open_gl_context;
 

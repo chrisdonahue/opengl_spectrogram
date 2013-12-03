@@ -29,6 +29,10 @@
 //==============================================================================
 spectrogram_component::spectrogram_component ()
 {
+	fft_size = 1024;
+	fft_overlap = 0;
+	fft_window_type = "rectangle";
+
     addAndMakeVisible (fft_size_selector = new ComboBox ("fft size controller"));
     fft_size_selector->setTooltip ("size of FFT");
     fft_size_selector->setEditableText (false);
@@ -102,8 +106,13 @@ spectrogram_component::spectrogram_component ()
 
     setSize (600, 600);
 
-
-    //[Constructor] You can add your own custom stuff here..
+    //[Constructor] You can add your own custom stuff here...
+#ifdef _WIN32
+    open_gl_gui_component->set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
+	//set_wav_file("D:\\My Code\\opengl_spectrogram\\test_sound.wav");
+#else
+    open_gl_gui_component->set_wav_file("../../../test_sound.wav");
+#endif
     //[/Constructor]
 }
 
@@ -180,7 +189,7 @@ void spectrogram_component::sliderValueChanged (Slider* sliderThatWasMoved)
     if (sliderThatWasMoved == fft_overlap_slider)
     {
         //[UserSliderCode_fft_overlap_slider] -- add your slider handling code here..
-		fft_overlap = (int) (double(get_fft_size()) * fft_overlap_slider->getValue());
+		fft_overlap = (int) (double(fft_size_selector->getText().getIntValue()) * fft_overlap_slider->getValue());
         //[/UserSliderCode_fft_overlap_slider]
     }
 
