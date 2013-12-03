@@ -26,6 +26,8 @@
 #include "open_gl_component.h"
 
 #include <stdlib.h>
+
+class open_gl_component;
 //[/Headers]
 
 
@@ -40,8 +42,7 @@
 */
 class spectrogram_component  : public Component,
                                public ComboBoxListener,
-                               public SliderListener,
-							   public Timer
+                               public SliderListener
 {
 public:
     //==============================================================================
@@ -50,12 +51,9 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-	void set_wav_file(std::string);
-    audio_util::wav_data* get_wav_file();
-    void compute_fft();
-
-    // JUCE callbacks
-    void timerCallback();
+	int get_fft_size();
+	int get_fft_overlap();
+	std::string get_fft_window_type();
     //[/UserMethods]
 
     void paint (Graphics& g);
@@ -67,11 +65,9 @@ public:
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
-	// wav file
-    audio_util::wav_data* wav_file;
-
-	// timer trigger
-    bool fft_values_changed;
+	int fft_size;
+	int fft_overlap;
+	std::string fft_window_type;
     //[/UserVariables]
 
     //==============================================================================
