@@ -112,7 +112,7 @@ spectrogram_component::spectrogram_component ()
     //open_gl_gui_component->set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
 	//set_wav_file("D:\\My Code\\opengl_spectrogram\\test_sound.wav");
 #else
-    open_gl_gui_component->set_wav_file("../../../test_sound.wav");
+    open_gl_gui_component->set_wav_file("../../test_sound.wav");
 #endif
     //[/Constructor]
 }

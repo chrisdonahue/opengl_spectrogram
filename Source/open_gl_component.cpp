@@ -76,11 +76,16 @@ void open_gl_component::renderOpenGL() {
     OpenGLHelpers::clear (Colours::black);
 
 	int num_bins = wav_file->get_num_bins_per_frame();
-	double* magnitudes = wav_file->get_fft_magnitudes_frame(0);
+	double* magnitudes = wav_file->get_fft_magnitudes_frame(10);
 
     glBegin(GL_LINE_STRIP);
-		for (int i = 0; i < num_bins; i++) {
-			glVertex2f(float(i)/float(num_bins), magnitudes[i]);
+        glVertex2f(-1.0f, 0.0f);
+		for (int i = 1; i < num_bins; i++) {
+            float x = float(i)/float(num_bins);
+            x = (x * 2.0f) - 1.0f;
+            float y = magnitudes[i];
+            //std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+			glVertex2f(x, y);
 		}
     glEnd(); 
 
@@ -199,8 +204,19 @@ void open_gl_component::compute_fft() {
 	std::string fft_window_type = current_fft_window_type;
 
     // re-compute fft
-    std::cerr << "Recomputing FFT with size: " << fft_size << ", overlap: " << fft_overlap << ", and window: " << fft_window_type << std::endl;
+    std::cerr << "Recomputing FFT with size " << fft_size << ", overlap " << fft_overlap << ", and window \'" << fft_window_type << "\'" << std::endl;
     wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);
+
+	int num_bins = wav_file->get_num_bins_per_frame();
+	double* magnitudes = wav_file->get_fft_magnitudes_frame(2);
+
+    /*
+    for (int i = 1; i < num_bins; i++) {
+        float x = float(i - 1)/float(num_bins - 1);
+        float y = magnitudes[i];
+        //std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+    }
+    */
 
 	// set last references
 	last_fft_size = fft_size;
