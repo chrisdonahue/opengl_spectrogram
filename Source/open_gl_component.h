@@ -46,19 +46,22 @@ public:
     void timerCallback();
 	
 	// wav file methods
+	void init_fft_params(int fft_size, int fft_overlap, std::string fft_window_type);
 	void set_wav_file(std::string file_path);
 	void compute_fft();
 	
 private:
-	// parent
-	spectrogram_component* parent;
-
 	// openGL state
 	OpenGLContext open_gl_context;
 
 	// wav file
 	CriticalSection wav_file_lock;
     audio_util::wav_data* wav_file;
+
+	// new timer state
+	int current_fft_size;
+	int current_fft_overlap;
+	std::string current_fft_window_type;
 
 	// old timer state
 	int last_fft_size;

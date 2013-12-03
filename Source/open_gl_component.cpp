@@ -16,9 +16,6 @@ open_gl_component::open_gl_component()
 {
 	// load wav file
 	wav_file = nullptr;
-	
-	// find parent
-	parent = ((spectrogram_component*) getParentComponent());
 
 	// openGL init
 	open_gl_context.setRenderer(this);
@@ -69,6 +66,10 @@ void open_gl_component::newOpenGLContextCreated() {
 }
 
 void open_gl_component::renderOpenGL() {
+	const ScopedLock sl(wav_file_lock);
+	if (wav_file == nullptr)
+		return;
+
     jassert (OpenGLHelpers::isContextActive());
 
     const float desktopScale = (float) open_gl_context.getRenderingScale();
@@ -150,10 +151,11 @@ void open_gl_component::timerCallback() {
 	if (wav_file == nullptr)
 		return;
 
-	// retrieve values from UI
-	int current_fft_size = parent->get_fft_size();
-	int current_fft_overlap = parent->get_fft_overlap();
-	std::string current_fft_window_type = parent->get_fft_window_type();
+	// retrieve values from parent UI
+	spectrogram_component* parent = ((spectrogram_component*) getParentComponent());
+	current_fft_size = parent->get_fft_size();
+	current_fft_overlap = parent->get_fft_overlap();
+	current_fft_window_type = parent->get_fft_window_type();
 
 	// update values if changed
     if (
@@ -164,6 +166,15 @@ void open_gl_component::timerCallback() {
 	{
         compute_fft();
     }
+}
+
+void open_gl_component::init_fft_params(int fft_size, int fft_overlap, std::string fft_window_type) {
+	current_fft_size = fft_size;
+	current_fft_overlap = fft_overlap;
+	current_fft_window_type = fft_window_type;
+	last_fft_size = fft_size;
+	last_fft_overlap = fft_overlap;
+	last_fft_window_type = fft_window_type;
 }
 
 void open_gl_component::set_wav_file(std::string file_path) {
@@ -178,13 +189,14 @@ void open_gl_component::set_wav_file(std::string file_path) {
 }
 
 void open_gl_component::compute_fft() {
+	const ScopedLock sl(wav_file_lock);
 	if (wav_file == nullptr)
 		return;
 
-	// retrieve values from UI
-	int fft_size = parent->get_fft_size();
-	int fft_overlap = parent->get_fft_overlap();
-	std::string fft_window_type = parent->get_fft_window_type();
+	// use current UI values
+	int fft_size = current_fft_size;
+	int fft_overlap = current_fft_overlap;
+	std::string fft_window_type = current_fft_window_type;
 
     // re-compute fft
     std::cerr << "Recomputing FFT with size: " << fft_size << ", overlap: " << fft_overlap << ", and window: " << fft_window_type << std::endl;
