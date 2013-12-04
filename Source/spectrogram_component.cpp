@@ -108,8 +108,8 @@ spectrogram_component::spectrogram_component ()
     //[Constructor] You can add your own custom stuff here...
 	open_gl_gui_component->init_fft_params(fft_size, fft_overlap, fft_window_type);
 #ifdef _WIN32
-    open_gl_gui_component->set_wav_file("C:\\Users\\Chris Donahue\\Code\\opengl_spectrogram\\test_sound.wav");
-    //open_gl_gui_component->set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
+    //open_gl_gui_component->set_wav_file("C:\\Users\\Chris Donahue\\Code\\opengl_spectrogram\\test_sound.wav");
+    open_gl_gui_component->set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
 	//set_wav_file("D:\\My Code\\opengl_spectrogram\\test_sound.wav");
 #else
     open_gl_gui_component->set_wav_file("../../test_sound.wav");

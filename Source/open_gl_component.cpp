@@ -28,7 +28,9 @@ open_gl_component::open_gl_component()
 
 open_gl_component::~open_gl_component()
 {
-    delete wav_file;
+	if (wav_file != nullptr)
+		delete wav_file;
+	open_gl_context.detach();
 }
 
 void open_gl_component::paint (Graphics& g)
@@ -76,7 +78,7 @@ void open_gl_component::renderOpenGL() {
     OpenGLHelpers::clear (Colours::black);
 
 	int num_bins = wav_file->get_num_bins_per_frame();
-	double* magnitudes = wav_file->get_fft_magnitudes_frame(10);
+	double* magnitudes = wav_file->get_fft_magnitudes_frame(20);
 
     glBegin(GL_LINE_STRIP);
         glVertex2f(-1.0f, 0.0f);
@@ -85,9 +87,11 @@ void open_gl_component::renderOpenGL() {
             x = (x * 2.0f) - 1.0f;
             float y = magnitudes[i];
             //std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+			glColor3f (1.0, 0.0, y);
 			glVertex2f(x, y);
 		}
     glEnd(); 
+	glFlush();
 
     /*
 	glPushMatrix();
