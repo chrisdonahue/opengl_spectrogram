@@ -11,6 +11,8 @@
 #ifndef OPEN_GL_COMPONENT_H_INCLUDED
 #define OPEN_GL_COMPONENT_H_INCLUDED
 
+#define PIXEL_EPSILON 1e-3f
+
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "audio_util.h"
 #include "spectrogram_component.h"
@@ -53,6 +55,7 @@ public:
 private:
 	// openGL state
 	OpenGLContext open_gl_context;
+	float rotation;
 
 	// wav file
 	CriticalSection wav_file_lock;

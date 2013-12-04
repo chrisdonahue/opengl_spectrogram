@@ -21,6 +21,7 @@ open_gl_component::open_gl_component()
 	open_gl_context.setRenderer(this);
 	open_gl_context.attachTo(*this);
 	open_gl_context.setContinuousRepainting(true);
+	rotation = 0.0f;
 
 	// start UI changed timer
     startTimer(1000);
@@ -74,24 +75,47 @@ void open_gl_component::renderOpenGL() {
 
     jassert (OpenGLHelpers::isContextActive());
 
-    const float desktopScale = (float) open_gl_context.getRenderingScale();
+    //const float desktopScale = (float) open_gl_context.getRenderingScale();
     OpenGLHelpers::clear (Colours::black);
 
+	// orient camera
+	glViewport (0, 0, (GLsizei) getWidth(), (GLsizei) getHeight());
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0, 1.0);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	// draw axes
+	glPushMatrix();
+		glBegin(GL_LINE_STRIP);
+			glColor3f (1.0f, 1.0f, 1.0f);
+			glVertex2f(0.0f + PIXEL_EPSILON, 0.0f + PIXEL_EPSILON);
+			glVertex2f(0.0f + PIXEL_EPSILON, 1.0f);
+		glEnd();
+	glPopMatrix();
+
+	// draw spectrogram
 	int num_bins = wav_file->get_num_bins_per_frame();
 	double* magnitudes = wav_file->get_fft_magnitudes_frame(20);
 
-    glBegin(GL_LINE_STRIP);
-        glVertex2f(-1.0f, 0.0f);
-		for (int i = 1; i < num_bins; i++) {
-            float x = float(i)/float(num_bins);
-            x = (x * 2.0f) - 1.0f;
-            float y = magnitudes[i];
-            //std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
-			glColor3f (1.0, 0.0, y);
-			glVertex2f(x, y);
-		}
-    glEnd(); 
+	glPushMatrix();
+		//glRotatef(rotation, 0.0f, 1.0f, 0.0f);
+		glBegin(GL_LINE_STRIP);
+			glColor3f (1.0f, 0.0f, 0.0f);
+			glVertex2f(-1.0f, 0.0f);
+			for (int i = 1; i < num_bins; i++) {
+				float x = float(i)/float(num_bins);
+				float y = (float) magnitudes[i];
+				//std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+				glColor3f (1.0f, 0.0f, y);
+				glVertex2f(x, y);
+			}
+		glEnd();
+	glPopMatrix();
 	glFlush();
+
+	rotation += 1.0f;
 
     /*
 	glPushMatrix();
@@ -211,8 +235,8 @@ void open_gl_component::compute_fft() {
     std::cerr << "Recomputing FFT with size " << fft_size << ", overlap " << fft_overlap << ", and window \'" << fft_window_type << "\'" << std::endl;
     wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);
 
-	int num_bins = wav_file->get_num_bins_per_frame();
-	double* magnitudes = wav_file->get_fft_magnitudes_frame(2);
+	//int num_bins = wav_file->get_num_bins_per_frame();
+	//double* magnitudes = wav_file->get_fft_magnitudes_frame(2);
 
     /*
     for (int i = 1; i < num_bins; i++) {
