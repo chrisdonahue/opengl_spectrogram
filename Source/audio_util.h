@@ -98,6 +98,11 @@ namespace audio_util {
             fft_performed = false;
         }
 
+        int get_num_frames() {
+            assert(fft_performed);
+            return fft_num_frames;
+        }
+
         int get_num_bins_per_frame() {
             assert(fft_performed);
             return (fft_size / 2 + 1);

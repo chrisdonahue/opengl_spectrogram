@@ -78,15 +78,20 @@ void open_gl_component::renderOpenGL() {
     //const float desktopScale = (float) open_gl_context.getRenderingScale();
     OpenGLHelpers::clear (Colours::black);
 
+	// draw spectrogram
+	int num_frames = wav_file->get_num_frames();
+	int num_bins = wav_file->get_num_bins_per_frame();
+
 	// orient camera
 	glViewport (0, 0, (GLsizei) getWidth(), (GLsizei) getHeight());
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0, 1.0);
+	glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, (float) num_frames);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	
 	// draw axes
+	/*
 	glPushMatrix();
 		glBegin(GL_LINE_STRIP);
 			glColor3f (1.0f, 1.0f, 1.0f);
@@ -94,24 +99,25 @@ void open_gl_component::renderOpenGL() {
 			glVertex2f(0.0f + PIXEL_EPSILON, 1.0f);
 		glEnd();
 	glPopMatrix();
-
-	// draw spectrogram
-	int num_bins = wav_file->get_num_bins_per_frame();
-	double* magnitudes = wav_file->get_fft_magnitudes_frame(20);
+	*/
 
 	glPushMatrix();
-		//glRotatef(rotation, 0.0f, 1.0f, 0.0f);
-		glBegin(GL_LINE_STRIP);
-			glColor3f (1.0f, 0.0f, 0.0f);
-			glVertex2f(-1.0f, 0.0f);
-			for (int i = 1; i < num_bins; i++) {
-				float x = float(i)/float(num_bins);
-				float y = (float) magnitudes[i];
-				//std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
-				glColor3f (1.0f, 0.0f, y);
-				glVertex2f(x, y);
-			}
-		glEnd();
+		//glRotatef(rotation, 1.0f, 0.0f, 0.0f);
+		for (int i = 0; i < num_frames; i++) {
+			double* magnitudes = wav_file->get_fft_magnitudes_frame(i);
+			float z = (float) i;
+			glBegin(GL_LINE_STRIP);
+				glColor3f (1.0f, 0.0f, z);
+				glVertex2f(-1.0f, 0.0f);
+				for (int j = 1; j < num_bins; j++) {
+					float x = float(j)/float(num_bins);
+					float y = (float) magnitudes[j];
+					//std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+					glColor3f (1.0f, 0.0f, y);
+					glVertex3f(x, y, z);
+				}
+			glEnd();
+		}
 	glPopMatrix();
 	glFlush();
 
