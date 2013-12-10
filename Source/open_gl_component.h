@@ -15,6 +15,7 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "audio_util.h"
+#include "shader_util.h"
 #include "spectrogram_component.h"
 
 class spectrogram_component;
