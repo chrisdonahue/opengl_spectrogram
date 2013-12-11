@@ -14,8 +14,13 @@
 #define PIXEL_EPSILON 1e-3f
 
 #include <assert.h>
+#include <math.h>
 
 #include "../JuceLibraryCode/JuceHeader.h"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "audio_util.h"
 #include "open_gl_juce_demo_structs.h"
@@ -62,6 +67,9 @@ private:
     ScopedPointer<OpenGLShaderProgram> shader;
     ScopedPointer<Attributes> attributes;
     ScopedPointer<Uniforms> uniforms;
+	GLuint vbo[2];
+	GLuint texture_id;
+	GLint uniform_mytexture;
 	
 	// model state
 	bool interpolate;
