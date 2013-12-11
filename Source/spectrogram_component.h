@@ -21,11 +21,12 @@
 #define __JUCE_HEADER_C912F8B9457FE626__
 
 //[Headers]     -- You can add your own extra header files here --
-#include "JuceHeader.h"
-#include "audio_util.h"
-#include "open_gl_component.h"
-
 #include <stdlib.h>
+
+#include "open_gl_component.h"
+#include "audio_util.h"
+
+#include "JuceHeader.h"
 
 class open_gl_component;
 //[/Headers]

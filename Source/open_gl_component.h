@@ -13,7 +13,14 @@
 
 #define PIXEL_EPSILON 1e-3f
 
+#include <assert.h>
+#include <GL/glew.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #include "../JuceLibraryCode/JuceHeader.h"
+
 #include "audio_util.h"
 #include "shader_util.h"
 #include "spectrogram_component.h"
@@ -28,7 +35,7 @@ class open_gl_component    : public Component,
 							 public Timer
 {
 public:
-    open_gl_component();
+    open_gl_component(std::string, std::string);
     ~open_gl_component();
 
     void paint (Graphics&);
@@ -53,9 +60,27 @@ public:
 	void set_wav_file(std::string file_path);
 	void compute_fft();
 	
+	// glew methods
+	bool init_glew_resources(std::string, std::string);
+	
 private:
-	// openGL state
+	// gl state
 	OpenGLContext open_gl_context;
+	GLuint program;
+	GLint attribute_coord2d;
+	GLint uniform_vertex_transform;
+	GLint uniform_texture_transform;
+	GLuint texture_id;
+	GLint uniform_mytexture;
+	GLuint vbo[2];
+	
+	// model state
+	bool interpolate;
+	bool clamp;
+	bool rotate;
+	float offset_x;
+	float offset_y;
+	float scale;
 	float rotation;
 
 	// wav file

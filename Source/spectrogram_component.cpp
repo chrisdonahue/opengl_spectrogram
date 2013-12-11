@@ -91,7 +91,7 @@ spectrogram_component::spectrogram_component ()
     fft_window_label->setColour (TextEditor::textColourId, Colours::black);
     fft_window_label->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
-    addAndMakeVisible (open_gl_gui_component = new open_gl_component());
+    addAndMakeVisible (open_gl_gui_component = new open_gl_component("shaders/vert_01.glsl", "shaders/frag_01.glsl"));
     open_gl_gui_component->setName ("openGL component");
 
 

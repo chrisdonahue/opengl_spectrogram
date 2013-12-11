@@ -8,9 +8,8 @@
   ==============================================================================
 */
 
-#include "../JuceLibraryCode/JuceHeader.h"
 #include "spectrogram_component.h"
-
+#include "../JuceLibraryCode/JuceHeader.h"
 
 //==============================================================================
 class opengl_spectrogramApplication  : public JUCEApplication
