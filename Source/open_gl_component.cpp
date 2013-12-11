@@ -150,7 +150,10 @@ void open_gl_component::renderOpenGL() {
 	shader->use();
     
     // wireframe display
-	open_gl_context.extensions.glUniform1i(uniform_mytexture, 0);
+	if (OpenGLShaderProgram::Uniform* uni = uniforms->mytexture) {
+		//glUniform1i(uniform_mytexture, 0);
+		open_gl_context.extensions.glUniform1i(uni->uniformID, 0);
+	}
 
 	glm::mat4 model;
 
@@ -191,16 +194,17 @@ void open_gl_component::renderOpenGL() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolate ? GL_LINEAR : GL_NEAREST);
 
 	/* Draw the grid using the indices to our vertices using our vertex buffer objects */
-	open_gl_context.extensions.glEnableVertexAttribArray(attribute_coord2d);
-
+	attributes->enable(open_gl_context);
+	//open_gl_context.extensions.glEnableVertexAttribArray(attribute_coord2d);
 	open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-	open_gl_context.extensions.glVertexAttribPointer(attribute_coord2d, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	//open_gl_context.extensions.glVertexAttribPointer(attribute_coord2d, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
 	open_gl_context.extensions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
 	glDrawElements(GL_LINES, 100 * 101 * 4, GL_UNSIGNED_SHORT, 0);
 
 	/* Stop using the vertex buffer object */
-	open_gl_context.extensions.glDisableVertexAttribArray(attribute_coord2d);
+	attributes->disable(open_gl_context);
+	//open_gl_context.extensions.glDisableVertexAttribArray(attribute_coord2d);
 	open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
 	open_gl_context.extensions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 

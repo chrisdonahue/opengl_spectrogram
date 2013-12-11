@@ -24,25 +24,27 @@ struct Attributes
     Attributes (OpenGLContext& openGLContext, OpenGLShaderProgram& shader)
     {
         coord2d = createAttribute (openGLContext, shader, "coord2d");
-        graph_coord = createAttribute (openGLContext, shader, "graph_coord");
     }
 
     void enable (OpenGLContext& openGLContext)
     {
         if (coord2d != nullptr)
         {
-            openGLContext.extensions.glVertexAttribPointer (coord2d->attributeID, 2, GL_FLOAT, GL_FALSE, sizeof (Vertex), 0);
+            //openGLContext.extensions.glVertexAttribPointer (coord2d->attributeID, 2, GL_FLOAT, GL_FALSE, sizeof (Vertex), 0);
+			openGLContext.extensions.glVertexAttribPointer (coord2d->attributeID, 2, GL_FLOAT, GL_FALSE, 0, 0);
             openGLContext.extensions.glEnableVertexAttribArray (coord2d->attributeID);
-        }
-
-        if (graph_coord != nullptr)
-        {
-            openGLContext.extensions.glVertexAttribPointer (graph_coord->attributeID, 4, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*) (sizeof (float) * 3));
-            openGLContext.extensions.glEnableVertexAttribArray (graph_coord->attributeID);
         }
     }
 
-    ScopedPointer<OpenGLShaderProgram::Attribute> coord2d, graph_coord;
+    void disable (OpenGLContext& openGLContext)
+    {
+        if (coord2d != nullptr)
+        {
+            openGLContext.extensions.glDisableVertexAttribArray (coord2d->attributeID);
+        }
+    }
+
+    ScopedPointer<OpenGLShaderProgram::Attribute> coord2d;
 
 private:
     static OpenGLShaderProgram::Attribute* createAttribute (OpenGLContext& openGLContext,
