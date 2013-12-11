@@ -40,48 +40,9 @@ open_gl_component::~open_gl_component()
 	// delete wav file/FFT data
 	if (wav_file != nullptr)
 		delete wav_file;
-
-	// delete shader data
-    shader = nullptr;
-    attributes = nullptr;
-    uniforms = nullptr;
 	
 	// detach from open gl
 	open_gl_context.detach();
-}
-
-void open_gl_component::update_shader(const String& newVertexShader, const String& newFragmentShader)
-{
-	if (!open_gl_context.isActive()) {
-		return;
-	}
-
-    ScopedPointer<OpenGLShaderProgram> newShader (new OpenGLShaderProgram (open_gl_context));
-    String statusText;
-
-    if (newShader->addVertexShader (newVertexShader)
-            && newShader->addFragmentShader (newFragmentShader)
-            && newShader->link())
-    {
-        attributes = nullptr;
-        uniforms = nullptr;
-
-        shader = newShader;
-        shader->use();
-
-        attributes = new Attributes (open_gl_context, *shader);
-        uniforms   = new Uniforms (open_gl_context, *shader);
-
-        #if ! JUCE_OPENGL_ES
-        statusText = "GLSL: v" + String (OpenGLShaderProgram::getLanguageVersion(), 2);
-        #else
-        statusText = "GLSL ES";
-        #endif
-    }
-    else
-    {
-        statusText = newShader->getLastError();
-    }
 }
 
 void open_gl_component::paint (Graphics& g)
@@ -213,6 +174,10 @@ void open_gl_component::renderOpenGL() {
 }
 
 void open_gl_component::openGLContextClosing() {
+	// delete shader data
+    shader = nullptr;
+    attributes = nullptr;
+    uniforms = nullptr;
 }
 
 void open_gl_component::timerCallback() {
@@ -255,7 +220,40 @@ void open_gl_component::set_wav_file(std::string file_path) {
 
 	// compute initial fft
 	compute_fft();
-	
+}
+
+void open_gl_component::compute_fft() {
+	const ScopedLock sl(wav_file_lock);
+	if (wav_file == nullptr)
+		return;
+
+	// use current UI values
+	int fft_size = current_fft_size;
+	int fft_overlap = current_fft_overlap;
+	std::string fft_window_type = current_fft_window_type;
+
+    // re-compute fft
+    std::cerr << "Recomputing FFT with size " << fft_size << ", overlap " << fft_overlap << ", and window \'" << fft_window_type << "\'" << std::endl;
+    wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);
+
+	//int num_bins = wav_file->get_num_bins_per_frame();
+	//double* magnitudes = wav_file->get_fft_magnitudes_frame(2);
+
+    /*
+    for (int i = 1; i < num_bins; i++) {
+        float x = float(i - 1)/float(num_bins - 1);
+        float y = magnitudes[i];
+        //std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+    }
+    */
+
+	// set last references
+	last_fft_size = fft_size;
+	last_fft_overlap = fft_overlap;
+	last_fft_window_type = fft_window_type;
+}
+
+void open_gl_component::create_vbo() {
 	// create datapoint array, store it as bytes
 #define N 2048
 	GLbyte graph[N][N];
@@ -316,33 +314,32 @@ void open_gl_component::set_wav_file(std::string file_path) {
 	open_gl_context.extensions.glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW);
 }
 
-void open_gl_component::compute_fft() {
-	const ScopedLock sl(wav_file_lock);
-	if (wav_file == nullptr)
-		return;
+void open_gl_component::update_shader(const String& newVertexShader, const String& newFragmentShader)
+{
+    ScopedPointer<OpenGLShaderProgram> newShader (new OpenGLShaderProgram (open_gl_context));
+    String statusText;
 
-	// use current UI values
-	int fft_size = current_fft_size;
-	int fft_overlap = current_fft_overlap;
-	std::string fft_window_type = current_fft_window_type;
+    if (newShader->addVertexShader (newVertexShader)
+            && newShader->addFragmentShader (newFragmentShader)
+            && newShader->link())
+    {
+        attributes = nullptr;
+        uniforms = nullptr;
 
-    // re-compute fft
-    std::cerr << "Recomputing FFT with size " << fft_size << ", overlap " << fft_overlap << ", and window \'" << fft_window_type << "\'" << std::endl;
-    wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);
+        shader = newShader;
+        shader->use();
 
-	//int num_bins = wav_file->get_num_bins_per_frame();
-	//double* magnitudes = wav_file->get_fft_magnitudes_frame(2);
+        attributes = new Attributes (open_gl_context, *shader);
+        uniforms   = new Uniforms (open_gl_context, *shader);
 
-    /*
-    for (int i = 1; i < num_bins; i++) {
-        float x = float(i - 1)/float(num_bins - 1);
-        float y = magnitudes[i];
-        //std::cerr << "Plotting: (" << x << ", " << y << ")" << std::endl;
+        #if ! JUCE_OPENGL_ES
+        statusText = "GLSL: v" + String (OpenGLShaderProgram::getLanguageVersion(), 2);
+        #else
+        statusText = "GLSL ES";
+        #endif
     }
-    */
-
-	// set last references
-	last_fft_size = fft_size;
-	last_fft_overlap = fft_overlap;
-	last_fft_window_type = fft_window_type;
+    else
+    {
+        statusText = newShader->getLastError();
+    }
 }

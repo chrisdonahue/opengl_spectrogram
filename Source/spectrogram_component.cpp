@@ -154,7 +154,6 @@ spectrogram_component::spectrogram_component ()
 	StringArray presetNames;
 	for (int i = 0; i < presets.size(); ++i)
 		shader_selector->addItem (presets[i].name, i + 1);
-
     shader_selector->setSelectedItemIndex(0);
     fft_size_selector->setSelectedItemIndex(3);
     fft_window_selector->setSelectedItemIndex(0);
@@ -168,13 +167,6 @@ spectrogram_component::spectrogram_component ()
 
     //[Constructor] You can add your own custom stuff here..
 	open_gl_gui_component->init_fft_params(fft_size, fft_overlap, fft_window_type);
-#ifdef _WIN32
-    //open_gl_gui_component->set_wav_file("C:\\Users\\Chris Donahue\\Code\\opengl_spectrogram\\test_sound.wav");
-    open_gl_gui_component->set_wav_file("C:\\Code\\opengl_spectrogram\\test_sound.wav");
-	//set_wav_file("D:\\My Code\\opengl_spectrogram\\test_sound.wav");
-#else
-    open_gl_gui_component->set_wav_file("../../test_sound.wav");
-#endif
     //[/Constructor]
 }
 
@@ -289,6 +281,13 @@ void spectrogram_component::buttonClicked (Button* buttonThatWasClicked)
     if (buttonThatWasClicked == load_button)
     {
         //[UserButtonCode_load_button] -- add your button handler code here..
+		FileChooser fc ("Choose an image to open...", File::getCurrentWorkingDirectory(), "*.wav;*.mp3");
+
+		if (fc.browseForFileToOpen())
+		{
+			open_gl_gui_component->set_wav_file(fc.getResult().getFullPathName().toStdString());
+			open_gl_gui_component->create_vbo();
+		}
         //[/UserButtonCode_load_button]
     }
     else if (buttonThatWasClicked == play_button)

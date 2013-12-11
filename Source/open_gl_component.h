@@ -59,6 +59,7 @@ public:
 	void compute_fft();
 
 	// open gl methods
+	void create_vbo();
 	void update_shader(const String&, const String&);
 	
 private:
@@ -69,7 +70,6 @@ private:
     ScopedPointer<Uniforms> uniforms;
 	GLuint vbo[2];
 	GLuint texture_id;
-	GLint uniform_mytexture;
 	
 	// model state
 	bool interpolate;
