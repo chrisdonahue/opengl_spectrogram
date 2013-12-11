@@ -122,14 +122,15 @@ void open_gl_component::newOpenGLContextCreated() {
 }
 
 void open_gl_component::renderOpenGL() {
-	const ScopedLock sl(wav_file_lock);
-	if (wav_file == nullptr)
-		return;
-
     jassert (OpenGLHelpers::isContextActive());
 
     //const float desktopScale = (float) open_gl_context.getRenderingScale();
     OpenGLHelpers::clear (Colours::black);
+
+	// acquire wav file lock
+	const ScopedLock sl(wav_file_lock);
+	if (wav_file == nullptr)
+		return;
     
     // wireframe display
 	glUseProgram(program);
