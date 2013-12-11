@@ -30,6 +30,9 @@ open_gl_component::open_gl_component()
 	open_gl_context.setRenderer(this);
 	open_gl_context.attachTo(*this);
 	open_gl_context.setContinuousRepainting(true);
+	vert_shader = "";
+	frag_shader = "";
+	recompile_shader = false;
 
 	// start UI changed timer
     startTimer(1000);
@@ -85,7 +88,8 @@ void open_gl_component::renderOpenGL() {
     //const float desktopScale = (float) open_gl_context.getRenderingScale();
     OpenGLHelpers::clear (Colours::black);
 
-	// check shader status
+	// update shader and check status
+	update_shader();
     if (shader == nullptr)
         return;
 
@@ -94,18 +98,17 @@ void open_gl_component::renderOpenGL() {
 	if (wav_file == nullptr)
 		return;
 
-	/*
     // Having used the juce 2D renderer, it will have messed-up a whole load of GL state, so
     // we need to initialise some important settings before doing our normal GL 3D drawing..
     glEnable (GL_DEPTH_TEST);
     glDepthFunc (GL_LESS);
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    openGLContext.extensions.glActiveTexture (GL_TEXTURE0);
+    open_gl_context.extensions.glActiveTexture (GL_TEXTURE0);
     glEnable (GL_TEXTURE_2D);
 
-    glViewport (0, 0, roundToInt (desktopScale * getWidth()), roundToInt (desktopScale * getHeight()));
-	*/
+    //glViewport (0, 0, roundToInt (desktopScale * getWidth()), roundToInt (desktopScale * getHeight()));
+    glViewport (0, 0, getWidth(), getHeight());
 
 	// use shader
 	shader->use();
@@ -254,6 +257,8 @@ void open_gl_component::compute_fft() {
 }
 
 void open_gl_component::create_vbo() {
+	std::cerr << "create_vbo attached: " << open_gl_context.isAttached() << ", active: " << open_gl_context.isActive() << std::endl;
+
 	// create datapoint array, store it as bytes
 #define N 2048
 	GLbyte graph[N][N];
@@ -314,8 +319,23 @@ void open_gl_component::create_vbo() {
 	open_gl_context.extensions.glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW);
 }
 
-void open_gl_component::update_shader(const String& newVertexShader, const String& newFragmentShader)
+void open_gl_component::set_new_shader(const String& v, const String& f) {
+	recompile_shader = true;
+	vert_shader = v;
+	frag_shader = f;
+}
+
+void open_gl_component::update_shader()
 {
+	if (!recompile_shader)
+		return;
+
+	const String& newVertexShader = vert_shader;
+	const String& newFragmentShader = frag_shader;
+	std::cerr << "update_shader attached: " << open_gl_context.isAttached() << ", active: " << open_gl_context.isActive() << std::endl;
+	std::cerr << "compiling vert shader: " << std::endl << newVertexShader << std::endl << std::endl;
+	std::cerr << "compiling frag shader: " << std::endl << newFragmentShader << std::endl << std::endl;
+
     ScopedPointer<OpenGLShaderProgram> newShader (new OpenGLShaderProgram (open_gl_context));
     String statusText;
 
@@ -342,4 +362,8 @@ void open_gl_component::update_shader(const String& newVertexShader, const Strin
     {
         statusText = newShader->getLastError();
     }
+    
+    std::cerr << "compilation result: " << statusText << std::endl;
+    
+    recompile_shader = false;
 }

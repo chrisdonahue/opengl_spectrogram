@@ -249,7 +249,7 @@ void spectrogram_component::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
     {
         //[UserComboBoxCode_shader_selector] -- add your combo box handling code here..
 		const ShaderPreset& p = getPresets()[shader_selector->getSelectedItemIndex()];
-		open_gl_gui_component->update_shader(p.vertexShader, p.fragmentShader);
+		open_gl_gui_component->set_new_shader(p.vertexShader, p.fragmentShader);
         //[/UserComboBoxCode_shader_selector]
     }
 

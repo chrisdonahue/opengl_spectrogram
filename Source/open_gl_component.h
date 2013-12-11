@@ -60,11 +60,15 @@ public:
 
 	// open gl methods
 	void create_vbo();
-	void update_shader(const String&, const String&);
+	void set_new_shader(const String&, const String&);
+	void update_shader();
 	
 private:
 	// gl state
 	OpenGLContext open_gl_context;
+	bool recompile_shader;
+	String vert_shader;
+	String frag_shader;
     ScopedPointer<OpenGLShaderProgram> shader;
     ScopedPointer<Attributes> attributes;
     ScopedPointer<Uniforms> uniforms;
