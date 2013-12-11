@@ -14,18 +14,10 @@
 #define PIXEL_EPSILON 1e-3f
 
 #include <assert.h>
-#include <GL/glew.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include "../JuceLibraryCode/JuceHeader.h"
 
 #include "audio_util.h"
-#include "shader_util.h"
-#include "spectrogram_component.h"
-
-class spectrogram_component;
 
 //==============================================================================
 /*

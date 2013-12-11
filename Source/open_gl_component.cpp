@@ -29,10 +29,6 @@ open_gl_component::open_gl_component(std::string vert_shader_file_path, std::str
 	open_gl_context.setRenderer(this);
 	open_gl_context.attachTo(*this);
 	open_gl_context.setContinuousRepainting(true);
-	
-	// glew init
-	bool glew_init_success = init_glew_resources(vert_shader_file_path, frag_shader_file_path);
-	assert(glew_init_success);
 
 	// start UI changed timer
     startTimer(1000);
