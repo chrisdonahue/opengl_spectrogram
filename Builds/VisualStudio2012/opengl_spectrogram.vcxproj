@@ -1191,6 +1191,7 @@
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\kiss_fft.h"/>
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\kissfft.hh"/>
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\tools\kiss_fftr.h"/>
+    <ClInclude Include="..\..\Source\open_gl_juce_demo_structs.h"/>
     <ClInclude Include="..\..\Source\open_gl_component.h"/>
     <ClInclude Include="..\..\Source\spectrogram_component.h"/>
     <ClInclude Include="..\..\Source\audio_util.h"/>

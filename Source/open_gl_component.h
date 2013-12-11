@@ -18,6 +18,7 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 
 #include "audio_util.h"
+#include "open_gl_juce_demo_structs.h"
 
 //==============================================================================
 /*
@@ -27,7 +28,7 @@ class open_gl_component    : public Component,
 							 public Timer
 {
 public:
-    open_gl_component(std::string, std::string);
+    open_gl_component();
     ~open_gl_component();
 
     void paint (Graphics&);
@@ -39,7 +40,7 @@ public:
 	void mouseWheelMove (const MouseEvent&, const MouseWheelDetails& d);
     void mouseMagnify (const MouseEvent&, float magnifyAmmount);
 
-	// open GL callbacks
+	// open gl callbacks
 	void newOpenGLContextCreated();
 	void renderOpenGL();
 	void openGLContextClosing();
@@ -51,20 +52,16 @@ public:
 	void init_fft_params(int fft_size, int fft_overlap, std::string fft_window_type);
 	void set_wav_file(std::string file_path);
 	void compute_fft();
-	
-	// glew methods
-	bool init_glew_resources(std::string, std::string);
+
+	// open gl methods
+	void update_shader(const String&, const String&);
 	
 private:
 	// gl state
 	OpenGLContext open_gl_context;
-	GLuint program;
-	GLint attribute_coord2d;
-	GLint uniform_vertex_transform;
-	GLint uniform_texture_transform;
-	GLuint texture_id;
-	GLint uniform_mytexture;
-	GLuint vbo[2];
+    ScopedPointer<OpenGLShaderProgram> shader;
+    ScopedPointer<Attributes> attributes;
+    ScopedPointer<Uniforms> uniforms;
 	
 	// model state
 	bool interpolate;

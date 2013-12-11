@@ -23,10 +23,10 @@
 //[Headers]     -- You can add your own extra header files here --
 #include <stdlib.h>
 
+#include "JuceHeader.h"
+
 #include "open_gl_component.h"
 #include "audio_util.h"
-
-#include "JuceHeader.h"
 
 class open_gl_component;
 //[/Headers]
@@ -43,7 +43,8 @@ class open_gl_component;
 */
 class spectrogram_component  : public Component,
                                public ComboBoxListener,
-                               public SliderListener
+                               public SliderListener,
+                               public ButtonListener
 {
 public:
     //==============================================================================
@@ -61,6 +62,28 @@ public:
     void resized();
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
     void sliderValueChanged (Slider* sliderThatWasMoved);
+    void buttonClicked (Button* buttonThatWasClicked);
+
+    // Binary resources:
+    static const char* button_play_png;
+    static const int button_play_pngSize;
+    static const char* button_pause_png;
+    static const int button_pause_pngSize;
+    static const char* button_stop_png;
+    static const int button_stop_pngSize;
+    static const char* button_hover_play_png;
+    static const int button_hover_play_pngSize;
+    static const char* button_hover_pause_png;
+    static const int button_hover_pause_pngSize;
+    static const char* button_hover_stop_png;
+    static const int button_hover_stop_pngSize;
+    static const char* button_down_play_png;
+    static const int button_down_play_pngSize;
+    static const char* button_down_pause_png;
+    static const int button_down_pause_pngSize;
+    static const char* button_down_stop_png;
+    static const int button_down_stop_pngSize;
+
 
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
@@ -77,6 +100,13 @@ private:
     ScopedPointer<Label> fft_overlap_label;
     ScopedPointer<Label> fft_window_label;
     ScopedPointer<open_gl_component> open_gl_gui_component;
+    ScopedPointer<ComboBox> shader_selector;
+    ScopedPointer<Label> shader_label;
+    ScopedPointer<Label> audio_controls_label;
+    ScopedPointer<TextButton> load_button;
+    ScopedPointer<ImageButton> play_button;
+    ScopedPointer<ImageButton> pause_button;
+    ScopedPointer<ImageButton> stop_button;
 
 
     //==============================================================================

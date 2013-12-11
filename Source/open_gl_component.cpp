@@ -9,9 +9,10 @@
 */
 
 #include "open_gl_component.h"
+#include "spectrogram_component.h"
 
 //==============================================================================
-open_gl_component::open_gl_component(std::string vert_shader_file_path, std::string frag_shader_file_path)
+open_gl_component::open_gl_component()
 {
 	// load wav file
 	wav_file = nullptr;
@@ -39,48 +40,48 @@ open_gl_component::~open_gl_component()
 	// delete wav file/FFT data
 	if (wav_file != nullptr)
 		delete wav_file;
-	
-	// delete glsl program
-	glDeleteProgram(program);
+
+	// delete shader data
+    shader = nullptr;
+    attributes = nullptr;
+    uniforms = nullptr;
 	
 	// detach from open gl
 	open_gl_context.detach();
 }
 
-bool open_gl_component::init_glew_resources(std::string vert_shader_file_path, std::string frag_shader_file_path) {
-	// init glew
-	GLenum glew_status = glewInit();
-	if (GLEW_OK != glew_status) {
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(glew_status));
-		return false;
-	}
-	if (!GLEW_VERSION_2_0) {
-		fprintf(stderr, "No support for OpenGL 2.0 found\n");
-		return false;
-	}
-	
-	// check something
-	GLint max_units;
-	glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, &max_units);
-	if (max_units < 1) {
-		fprintf(stderr, "Your GPU does not have any vertex texture image units\n");
-		return false;
+void open_gl_component::update_shader(const String& newVertexShader, const String& newFragmentShader)
+{
+	if (!open_gl_context.isActive()) {
+		return;
 	}
 
-	// create glsl program
-	program = shader_util::create_program(vert_shader_file_path.c_str(), frag_shader_file_path.c_str());
-	if (program == 0) {
-		return false;
-	}
-	
-	// retrieve attributes from program
-	attribute_coord2d = shader_util::get_attrib(program, "coord2d");
-	uniform_vertex_transform = shader_util::get_uniform(program, "vertex_transform");
-	uniform_texture_transform = shader_util::get_uniform(program, "texture_transform");
-	uniform_mytexture = shader_util::get_uniform(program, "mytexture");
-	if (attribute_coord2d == -1 || uniform_vertex_transform == -1 || uniform_texture_transform == -1 || uniform_mytexture == -1) {
-		return false;
-	}
+    ScopedPointer<OpenGLShaderProgram> newShader (new OpenGLShaderProgram (open_gl_context));
+    String statusText;
+
+    if (newShader->addVertexShader (newVertexShader)
+            && newShader->addFragmentShader (newFragmentShader)
+            && newShader->link())
+    {
+        attributes = nullptr;
+        uniforms = nullptr;
+
+        shader = newShader;
+        shader->use();
+
+        attributes = new Attributes (open_gl_context, *shader);
+        uniforms   = new Uniforms (open_gl_context, *shader);
+
+        #if ! JUCE_OPENGL_ES
+        statusText = "GLSL: v" + String (OpenGLShaderProgram::getLanguageVersion(), 2);
+        #else
+        statusText = "GLSL ES";
+        #endif
+    }
+    else
+    {
+        statusText = newShader->getLastError();
+    }
 }
 
 void open_gl_component::paint (Graphics& g)
@@ -123,22 +124,25 @@ void open_gl_component::renderOpenGL() {
     //const float desktopScale = (float) open_gl_context.getRenderingScale();
     OpenGLHelpers::clear (Colours::black);
 
+	// check shader status
+    if (shader == nullptr)
+        return;
+
 	// acquire wav file lock
 	const ScopedLock sl(wav_file_lock);
 	if (wav_file == nullptr)
 		return;
     
     // wireframe display
+	/*
 	glUseProgram(program);
 	glUniform1i(uniform_mytexture, 0);
 
 	glm::mat4 model;
 
-	/*
 	if (rotate)
 		model = glm::rotate(glm::mat4(1.0f), float (glutGet(GLUT_ELAPSED_TIME) / 100.0), glm::vec3(0.0f, 0.0f, 1.0f));
 	else
-	*/
 		model = glm::mat4(1.0f);
 
 	glm::mat4 view = glm::lookAt(glm::vec3(0.0, -2.0, 2.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 1.0));
@@ -153,15 +157,15 @@ void open_gl_component::renderOpenGL() {
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	/* Set texture wrapping mode */
+	// Set texture wrapping mode
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT);
 
-	/* Set texture interpolation mode */
+	// Set texture interpolation mode
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interpolate ? GL_LINEAR : GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolate ? GL_LINEAR : GL_NEAREST);
 
-	/* Draw the grid using the indices to our vertices using our vertex buffer objects */
+	// Draw the grid using the indices to our vertices using our vertex buffer objects
 	glEnableVertexAttribArray(attribute_coord2d);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
@@ -170,10 +174,11 @@ void open_gl_component::renderOpenGL() {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
 	glDrawElements(GL_LINES, 100 * 101 * 4, GL_UNSIGNED_SHORT, 0);
 
-	/* Stop using the vertex buffer object */
+	// Stop using the vertex buffer object
 	glDisableVertexAttribArray(attribute_coord2d);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	*/
 
 	// swap gl buffers
 	open_gl_context.swapBuffers();
@@ -332,6 +337,7 @@ void open_gl_component::set_wav_file(std::string file_path) {
 	compute_fft();
 	
 	// create datapoint array, store it as bytes
+	/*
 #define N 2048
 	GLbyte graph[N][N];
 
@@ -346,7 +352,7 @@ void open_gl_component::set_wav_file(std::string file_path) {
 		}
 	}
 
-	/* Upload the texture with our datapoints */
+	// Upload the texture with our datapoints
 	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &texture_id);
 	glBindTexture(GL_TEXTURE_2D, texture_id);
@@ -389,6 +395,7 @@ void open_gl_component::set_wav_file(std::string file_path) {
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW);
+	*/
 }
 
 void open_gl_component::compute_fft() {

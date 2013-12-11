@@ -20,42 +20,29 @@ struct Vertex
 // This class just manages the attributes that the demo shaders use.
 struct Attributes
 {
+
     Attributes (OpenGLContext& openGLContext, OpenGLShaderProgram& shader)
     {
-        position      = createAttribute (openGLContext, shader, "position");
-        normal        = createAttribute (openGLContext, shader, "normal");
-        sourceColour  = createAttribute (openGLContext, shader, "sourceColour");
-        texureCoordIn = createAttribute (openGLContext, shader, "texureCoordIn");
+        coord2d = createAttribute (openGLContext, shader, "coord2d");
+        graph_coord = createAttribute (openGLContext, shader, "graph_coord");
     }
 
     void enable (OpenGLContext& openGLContext)
     {
-        if (position != nullptr)
+        if (coord2d != nullptr)
         {
-            openGLContext.extensions.glVertexAttribPointer (position->attributeID, 3, GL_FLOAT, GL_FALSE, sizeof (Vertex), 0);
-            openGLContext.extensions.glEnableVertexAttribArray (position->attributeID);
+            openGLContext.extensions.glVertexAttribPointer (coord2d->attributeID, 2, GL_FLOAT, GL_FALSE, sizeof (Vertex), 0);
+            openGLContext.extensions.glEnableVertexAttribArray (coord2d->attributeID);
         }
 
-        if (normal != nullptr)
+        if (graph_coord != nullptr)
         {
-            openGLContext.extensions.glVertexAttribPointer (normal->attributeID, 3, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*) (sizeof (float) * 3));
-            openGLContext.extensions.glEnableVertexAttribArray (normal->attributeID);
-        }
-
-        if (sourceColour != nullptr)
-        {
-            openGLContext.extensions.glVertexAttribPointer (sourceColour->attributeID, 4, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*) (sizeof (float) * 6));
-            openGLContext.extensions.glEnableVertexAttribArray (sourceColour->attributeID);
-        }
-
-        if (texureCoordIn != nullptr)
-        {
-            openGLContext.extensions.glVertexAttribPointer (texureCoordIn->attributeID, 2, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*) (sizeof (float) * 10));
-            openGLContext.extensions.glEnableVertexAttribArray (texureCoordIn->attributeID);
+            openGLContext.extensions.glVertexAttribPointer (graph_coord->attributeID, 4, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*) (sizeof (float) * 3));
+            openGLContext.extensions.glEnableVertexAttribArray (graph_coord->attributeID);
         }
     }
 
-    ScopedPointer<OpenGLShaderProgram::Attribute> position, normal, sourceColour, texureCoordIn;
+    ScopedPointer<OpenGLShaderProgram::Attribute> coord2d, graph_coord;
 
 private:
     static OpenGLShaderProgram::Attribute* createAttribute (OpenGLContext& openGLContext,
@@ -75,14 +62,12 @@ struct Uniforms
 {
     Uniforms (OpenGLContext& openGLContext, OpenGLShaderProgram& shader)
     {
-        projectionMatrix = createUniform (openGLContext, shader, "projectionMatrix");
-        viewMatrix       = createUniform (openGLContext, shader, "viewMatrix");
-        texture          = createUniform (openGLContext, shader, "texture");
-        lightPosition    = createUniform (openGLContext, shader, "lightPosition");
-        bouncingNumber   = createUniform (openGLContext, shader, "bouncingNumber");
+        texture_transform = createUniform (openGLContext, shader, "texture_transform");
+        vertex_transform  = createUniform (openGLContext, shader, "vertex_transform");
+        mytexture = createUniform (openGLContext, shader, "mytexture");
     }
 
-    ScopedPointer<OpenGLShaderProgram::Uniform> projectionMatrix, viewMatrix, texture, lightPosition, bouncingNumber;
+    ScopedPointer<OpenGLShaderProgram::Uniform> texture_transform, vertex_transform, mytexture;
 
 private:
     static OpenGLShaderProgram::Uniform* createUniform (OpenGLContext& openGLContext,

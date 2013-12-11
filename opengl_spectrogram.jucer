@@ -18,6 +18,8 @@
       </GROUP>
     </GROUP>
     <GROUP id="{FA150489-45AC-61FB-336F-0C69A4ECF447}" name="Source">
+      <FILE id="fXBO4t" name="open_gl_juce_demo_structs.h" compile="0" resource="0"
+            file="Source/open_gl_juce_demo_structs.h"/>
       <FILE id="UGcvqR" name="open_gl_component.cpp" compile="1" resource="0"
             file="Source/open_gl_component.cpp"/>
       <FILE id="lMYXvU" name="open_gl_component.h" compile="0" resource="0"

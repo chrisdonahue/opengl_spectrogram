@@ -1452,6 +1452,9 @@
     <ClInclude Include="..\..\Source\dependencies\kiss_fft130\tools\kiss_fftr.h">
       <Filter>opengl_spectrogram\dependencies\kiss_fft130\tools</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\open_gl_juce_demo_structs.h">
+      <Filter>opengl_spectrogram\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\open_gl_component.h">
       <Filter>opengl_spectrogram\Source</Filter>
     </ClInclude>
