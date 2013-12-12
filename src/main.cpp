@@ -1,3 +1,4 @@
+#include <limits>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -14,6 +15,7 @@
 #include "audio_util.h"
 #include "shader_utils.h"
 
+// gl state
 GLuint program;
 GLint attribute_coord2d;
 GLint uniform_vertex_transform;
@@ -21,10 +23,15 @@ GLint uniform_texture_transform;
 GLuint texture_id;
 GLint uniform_mytexture;
 
+// wav file
+audio_util::wav_data* wav_file;
+
+// model variables
 float offset_x = 0.0;
 float offset_y = 0.0;
 float scale = 1.0;
 
+// display settings
 bool interpolate = false;
 bool clamp = false;
 bool rotate = false;
@@ -45,25 +52,85 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
 		return 0;
 
 	// Create our datapoints, store it as bytes
-#define N 2048
+    int num_frames = wav_file->get_num_frames();
+    int num_bins_per_frame = wav_file->get_num_bins_per_frame();
+    GLbyte graph[num_frames][num_bins_per_frame];
+
+    for (int i = 0; i < num_frames; i++) {
+        double* frame_magnitudes = wav_file->get_fft_magnitudes_frame(i);
+        for (int j = 0; j < num_bins_per_frame; j++) {
+            double bin_magnitude = frame_magnitudes[j];
+			graph[i][j] = roundf(bin_magnitude * 127 + 128);
+        }
+    }
+
+    /*
+#define N 16
 	GLbyte graph[N][N];
+
+    // calculate data ranges
+    float x_min = std::numeric_limits<float>::infinity();
+    float x_max = std::numeric_limits<float>::infinity() * -1.0f;
+    float y_min = std::numeric_limits<float>::infinity();
+    float y_max = std::numeric_limits<float>::infinity() * -1.0f;
+    float d_min = std::numeric_limits<float>::infinity();
+    float d_max = std::numeric_limits<float>::infinity() * -1.0f;
+    float z_min = std::numeric_limits<float>::infinity();
+    float z_max = std::numeric_limits<float>::infinity() * -1.0f;
+    int g_min = std::numeric_limits<int>::max();
+    int g_max = std::numeric_limits<int>::min();
 
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
+            // map i, j from -1.0 to 1.0
 			float x = (i - N / 2) / (N / 2.0);
 			float y = (j - N / 2) / (N / 2.0);
 			float d = hypotf(x, y) * 4.0;
 			float z = (1 - d * d) * expf(d * d / -2.0);
-
+            
 			graph[i][j] = roundf(z * 127 + 128);
+            int g = (int) graph[i][j];
+            
+            // calculate ranges
+            if (x < x_min)
+                x_min = x;
+            if (x > x_max)
+                x_max = x;
+            if (y < y_min)
+                y_min = y;
+            if (y > y_max)
+                y_max = y;
+            if (d < d_min)
+                d_min = d;
+            if (d > d_max)
+                d_max = d;
+            if (z < z_min)
+                z_min = z;
+            if (z > z_max)
+                z_max = z;
+            if (g < g_min)
+                g_min = g;
+            if (g > g_max)
+                g_max = g;
+
+            std::cerr << "(" << i << ", " << j << ") -> (" << x << ", " << y << ", " << z << "): " << (int) graph[i][j] << std::endl;
 		}
 	}
+
+    // print ranges
+    std::cerr << "x: [" << x_min << ", " << x_max << "]" << std::endl;
+    std::cerr << "y: [" << y_min << ", " << y_max << "]" << std::endl;
+    std::cerr << "d: [" << d_min << ", " << d_max << "]" << std::endl;
+    std::cerr << "z: [" << z_min << ", " << z_max << "]" << std::endl;
+    std::cerr << "g: [" << g_min << ", " << g_max << "]" << std::endl;
+    */
 
 	/* Upload the texture with our datapoints */
 	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &texture_id);
 	glBindTexture(GL_TEXTURE_2D, texture_id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_per_frame, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
 
 	// Create two vertex buffer objects
 	glGenBuffers(2, vbo);
@@ -253,7 +320,7 @@ int main(int argc, char *argv[]) {
     }
 
     // load wav file
-    audio_util::wav_data* wav_file = new audio_util::wav_data(audio_file_path);
+    wav_file = new audio_util::wav_data(audio_file_path);
 
     // compuate wav file FFT
     wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);

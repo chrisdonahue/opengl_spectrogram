@@ -20,6 +20,7 @@
 
 #include <assert.h>
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace audio_util {
@@ -85,6 +86,36 @@ namespace audio_util {
             free(fft_amplitude_buffer);
             free(fft_window);
 
+            // calculate min/max
+            fft_magnitude_min = std::numeric_limits<double>::infinity();
+            fft_magnitude_max = std::numeric_limits<double>::infinity() * -1.0;
+            fft_magnitude_min_per_frame = (double*) malloc(sizeof(double) * fft_num_frames);
+            fft_magnitude_max_per_frame = (double*) malloc(sizeof(double) * fft_num_frames);
+            for (int i = 0; i < fft_num_frames; i++) {
+                // init temp variables for frame_min, frame_max
+                double frame_min = std::numeric_limits<double>::infinity();
+                double frame_max = std::numeric_limits<double>::infinity() * -1.0;
+
+                // find frame min/max
+                for (int j = 1; j < fft_num_bins; j++) {
+                    double bin_val = *(fft_magnitudes + (fft_num_bins * i) + j);
+                    if (bin_val < frame_min)
+                        frame_min = bin_val;
+                    if (bin_val > frame_max)
+                        frame_max = bin_val;
+                }
+
+                // set min/max array value
+                fft_magnitude_min_per_frame[i] = frame_min;
+                fft_magnitude_max_per_frame[i] = frame_max;
+
+                // update global min/max
+                if (frame_min < fft_magnitude_min)
+                    fft_magnitude_min = frame_min;
+                if (frame_max > fft_magnitude_max)
+                    fft_magnitude_max = frame_max;
+            }
+
             // set fft performed flag to true
             fft_performed = true;
         };
@@ -94,8 +125,10 @@ namespace audio_util {
                 free(fft_spectra);
                 free(fft_magnitudes);
                 free(fft_phases);
+                free(fft_magnitude_min_per_frame);
+                free(fft_magnitude_max_per_frame);
+                fft_performed = false;
             }
-            fft_performed = false;
         }
 
         int get_num_frames() {
@@ -120,6 +153,26 @@ namespace audio_util {
             return fft_phases + (get_num_bins_per_frame() * i);
         }
 
+        double get_fft_magnitude_min_frame(int i) {
+            assert(fft_performed);
+            return fft_magnitude_min_per_frame[i];
+        }
+
+        double get_fft_magnitude_max_frame(int i) {
+            assert(fft_performed);
+            return fft_magnitude_max_per_frame[i];
+        }
+
+        double get_fft_magnitude_min() {
+            assert(fft_performed);
+            return fft_magnitude_min;
+        }
+
+        double get_fft_magnitude_max() {
+            assert(fft_performed);
+            return fft_magnitude_max;
+        }
+
         // source file path for this wav file
         std::string source_file_path;
         
@@ -139,6 +192,10 @@ namespace audio_util {
         int fft_num_frames;
         kiss_fft_cpx* fft_spectra;
         double* fft_magnitudes;
+        double* fft_magnitude_min_per_frame;
+        double* fft_magnitude_max_per_frame;
+        double fft_magnitude_min;
+        double fft_magnitude_max;
         double* fft_phases;
         kiss_fft_scalar* fft_amplitude_buffer;
         kiss_fft_cpx* fft_spectra_buffer;
