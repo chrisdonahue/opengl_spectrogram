@@ -4,33 +4,28 @@
               bundleIdentifier="com.yourcompany.opengl_spectrogram" includeBinaryInAppConfig="1"
               jucerVersion="3.1.0">
   <MAINGROUP id="jgyg2k" name="opengl_spectrogram">
-    <GROUP id="{34595AC8-CD03-06BA-955A-5F594BD83816}" name="dependencies">
-      <GROUP id="{6B7CC30B-23E1-9363-642D-D93835E19F87}" name="kiss_fft130">
-        <FILE id="PQOCAI" name="_kiss_fft_guts.h" compile="0" resource="0"
-              file="Source/dependencies/kiss_fft130/_kiss_fft_guts.h"/>
-        <FILE id="fruPWA" name="kiss_fft.c" compile="1" resource="0" file="Source/dependencies/kiss_fft130/kiss_fft.c"/>
-        <FILE id="JpmpPl" name="kiss_fft.h" compile="0" resource="0" file="Source/dependencies/kiss_fft130/kiss_fft.h"/>
-        <FILE id="s4hT1u" name="kissfft.hh" compile="0" resource="0" file="Source/dependencies/kiss_fft130/kissfft.hh"/>
-        <GROUP id="{B51A8EDA-1769-0396-1C89-24AA9A6C0C10}" name="tools">
-          <FILE id="oSRed6" name="kiss_fftr.c" compile="1" resource="0" file="Source/dependencies/kiss_fft130/tools/kiss_fftr.c"/>
-          <FILE id="IxY7Ca" name="kiss_fftr.h" compile="0" resource="0" file="Source/dependencies/kiss_fft130/tools/kiss_fftr.h"/>
+    <GROUP id="{E854E665-2359-A844-7F2B-C39FFFE1E076}" name="src">
+      <FILE id="w2LXAl" name="audio_util.cpp" compile="1" resource="0" file="src/audio_util.cpp"/>
+      <FILE id="ht24nL" name="audio_util.h" compile="0" resource="0" file="src/audio_util.h"/>
+      <GROUP id="{B67CADFC-7C39-4FF5-D049-2A97D9A81E44}" name="dependencies">
+        <GROUP id="{A2896AC1-74C4-37E4-06E8-DE35D5985FFE}" name="kiss_fft130">
+          <FILE id="pSN2Ts" name="_kiss_fft_guts.h" compile="0" resource="0"
+                file="src/dependencies/kiss_fft130/_kiss_fft_guts.h"/>
+          <FILE id="ugF2DH" name="kiss_fft.c" compile="1" resource="0" file="src/dependencies/kiss_fft130/kiss_fft.c"/>
+          <FILE id="Weoj4w" name="kiss_fft.h" compile="0" resource="0" file="src/dependencies/kiss_fft130/kiss_fft.h"/>
+          <FILE id="te7BjD" name="kissfft.hh" compile="0" resource="0" file="src/dependencies/kiss_fft130/kissfft.hh"/>
+          <GROUP id="{2BA9F9B8-9FDA-57AE-CB40-71872EE45D5F}" name="tools">
+            <FILE id="Z48qUj" name="kiss_fftr.c" compile="1" resource="0" file="src/dependencies/kiss_fft130/tools/kiss_fftr.c"/>
+            <FILE id="rsSK7l" name="kiss_fftr.h" compile="0" resource="0" file="src/dependencies/kiss_fft130/tools/kiss_fftr.h"/>
+          </GROUP>
         </GROUP>
       </GROUP>
-    </GROUP>
-    <GROUP id="{FA150489-45AC-61FB-336F-0C69A4ECF447}" name="Source">
-      <FILE id="fXBO4t" name="open_gl_juce_demo_structs.h" compile="0" resource="0"
-            file="Source/open_gl_juce_demo_structs.h"/>
-      <FILE id="UGcvqR" name="open_gl_component.cpp" compile="1" resource="0"
-            file="Source/open_gl_component.cpp"/>
-      <FILE id="lMYXvU" name="open_gl_component.h" compile="0" resource="0"
-            file="Source/open_gl_component.h"/>
-      <FILE id="N0mXBf" name="spectrogram_component.cpp" compile="1" resource="0"
-            file="Source/spectrogram_component.cpp"/>
-      <FILE id="g4Z0YC" name="spectrogram_component.h" compile="0" resource="0"
-            file="Source/spectrogram_component.h"/>
-      <FILE id="DvVjh6" name="audio_util.cpp" compile="1" resource="0" file="Source/audio_util.cpp"/>
-      <FILE id="bj2m85" name="audio_util.h" compile="0" resource="0" file="Source/audio_util.h"/>
-      <FILE id="lcgWz7" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
+      <FILE id="TuHXpc" name="graph.cpp" compile="1" resource="0" file="src/graph.cpp"/>
+      <FILE id="BhQ3Hz" name="graph.f.glsl" compile="0" resource="1" file="src/graph.f.glsl"/>
+      <FILE id="BSDyFT" name="graph.v.glsl" compile="0" resource="1" file="src/graph.v.glsl"/>
+      <FILE id="B3DYIG" name="shader_utils.cpp" compile="1" resource="0"
+            file="src/shader_utils.cpp"/>
+      <FILE id="bfQPPQ" name="shader_utils.h" compile="0" resource="0" file="src/shader_utils.h"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
@@ -42,17 +37,11 @@
                        targetName="opengl_spectrogram"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
-        <MODULEPATH id="juce_core" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_events" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_graphics" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_data_structures" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_gui_basics" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_gui_extra" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_opengl" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_audio_basics" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_audio_devices" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_audio_formats" path="..\JUCE\modules"/>
-        <MODULEPATH id="juce_audio_processors" path="..\JUCE\modules"/>
+        <MODULEPATH id="juce_core" path="~/JUCE/modules/"/>
+        <MODULEPATH id="juce_audio_basics" path="~/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="~/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="~/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="~/JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2012 targetFolder="Builds/VisualStudio2012">
@@ -63,12 +52,6 @@
                        isDebug="0" optimisation="2" targetName="opengl_spectrogram"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
-        <MODULEPATH id="juce_opengl" path="../../juce"/>
-        <MODULEPATH id="juce_gui_extra" path="../../juce"/>
-        <MODULEPATH id="juce_gui_basics" path="../../juce"/>
-        <MODULEPATH id="juce_graphics" path="../../juce"/>
-        <MODULEPATH id="juce_events" path="../../juce"/>
-        <MODULEPATH id="juce_data_structures" path="../../juce"/>
         <MODULEPATH id="juce_core" path="../../juce"/>
         <MODULEPATH id="juce_audio_processors" path="../../juce"/>
         <MODULEPATH id="juce_audio_formats" path="../../juce"/>
@@ -83,12 +66,6 @@
     <MODULES id="juce_audio_formats" showAllCode="1" useLocalCopy="1"/>
     <MODULES id="juce_audio_processors" showAllCode="1" useLocalCopy="1"/>
     <MODULES id="juce_core" showAllCode="1" useLocalCopy="1"/>
-    <MODULES id="juce_data_structures" showAllCode="1" useLocalCopy="1"/>
-    <MODULES id="juce_events" showAllCode="1" useLocalCopy="1"/>
-    <MODULES id="juce_graphics" showAllCode="1" useLocalCopy="1"/>
-    <MODULES id="juce_gui_basics" showAllCode="1" useLocalCopy="1"/>
-    <MODULES id="juce_gui_extra" showAllCode="1" useLocalCopy="1"/>
-    <MODULES id="juce_opengl" showAllCode="1" useLocalCopy="1"/>
   </MODULES>
   <JUCEOPTIONS/>
 </JUCERPROJECT>
