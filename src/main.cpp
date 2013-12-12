@@ -11,6 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "audio_util.h"
 #include "shader_utils.h"
 
 GLuint program;
@@ -30,8 +31,8 @@ bool rotate = false;
 
 GLuint vbo[2];
 
-int init_resources() {
-	program = create_program("graph.v.glsl", "graph.f.glsl");
+int init_resources(std::string vert_shader_file_path, std::string frag_shader_file_path) {
+	program = create_program(vert_shader_file_path.c_str(), frag_shader_file_path.c_str());
 	if (program == 0)
 		return 0;
 
@@ -212,11 +213,11 @@ int main(int argc, char *argv[]) {
     std::string audio_file_path;
 
     // parse command line
-    po::options_description cl_desc("Allowed options");
+    po::options_description cl_desc("Available options");
     cl_desc.add_options()
         ("help", "display help message")
         ("fft_size", po::value<int>(&(fft_size))->default_value(1024), "fft size")
-        ("fft_size", po::value<int>(&(fft_overlap))->default_value(0), "fft overlap")
+        ("fft_overlap", po::value<int>(&(fft_overlap))->default_value(0), "fft overlap")
         ("fft_window_type", po::value<std::string>(&fft_window_type)->default_value("rectangle"), "fft window type")
         ("vertex_shader_file_path", po::value<std::string>(&vertex_shader_file_path), "vertex shader file path")
         ("fragment_shader_file_path", po::value<std::string>(&fragment_shader_file_path), "fragment shader file path")
@@ -232,11 +233,35 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    // validate args
+    // validate fft_size
+    if (fft_size <= 0 || fft_size % 2 == 1) {
+        std::cerr << "fft size must be an even number greater than 0" << std::endl;
+        return 1;
+    }
+
+    // validate fft_overlap
+    if (fft_overlap < 0 || fft_overlap >= fft_size) {
+        std::cerr << "fft overlap must be a positive number less than fft size" << std::endl;
+        return 1;
+    }
+
+    // validate fft_window_type
+    if (!(fft_window_type.compare("rectangle") == 0 ||
+          fft_window_type.compare("hanning") == 0)) {
+        std::cerr << "fft window type must be 'rectangle' or 'hanning'" << std::endl;
+        return 1;
+    }
+
+    // load wav file
+    audio_util::wav_data* wav_file = new audio_util::wav_data(audio_file_path);
+
+    // compuate wav file FFT
+    wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);
     
     // debug command line
-    std::cerr << fft_size << ", " << fft_overlap << ", " << fft_window_type << ", " << vertex_shader_file_path << ", " << fragment_shader_file_path << ", " << audio_file_path << std::endl;
+    std::cerr << "Displaying FFT of " << audio_file_path << " with size " << fft_size << ", overlap " << fft_overlap << ", and window type " << fft_window_type << "." << std::endl;
 
+    // graph example from here on
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutInitWindowSize(640, 480);
@@ -262,14 +287,14 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	printf("Use left/right/up/down to move.\n");
-	printf("Use pageup/pagedown to change the horizontal scale.\n");
-	printf("Press home to reset the position and scale.\n");
-	printf("Press F1 to toggle interpolation.\n");
-	printf("Press F2 to toggle clamping.\n");
-	printf("Press F3 to toggle rotation.\n");
+	//printf("Use left/right/up/down to move.\n");
+	//printf("Use pageup/pagedown to change the horizontal scale.\n");
+	//printf("Press home to reset the position and scale.\n");
+	//printf("Press F1 to toggle interpolation.\n");
+	//printf("Press F2 to toggle clamping.\n");
+	//printf("Press F3 to toggle rotation.\n");
 
-	if (init_resources()) {
+	if (init_resources(vertex_shader_file_path, fragment_shader_file_path)) {
 		glutDisplayFunc(display);
 		glutIdleFunc(display);
 		glutSpecialFunc(special);

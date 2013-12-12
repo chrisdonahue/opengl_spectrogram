@@ -5,10 +5,10 @@ set -e
 #<<COMMENT
 #valgrind --tool=callgrind \
 #gdb --args \
-./build/open_gl_spectrogram \
+./build/opengl_spectrogram \
     --fft_size 1024 \
     --fft_overlap 0 \
-    --fft_window_type rectangle \
+    --fft_window_type hanning \
     --vertex_shader_file_path ./shaders/graph.v.glsl \
     --fragment_shader_file_path ./shaders/graph.f.glsl \
     --audio_file_path ./audio/valve_intro.wav 
