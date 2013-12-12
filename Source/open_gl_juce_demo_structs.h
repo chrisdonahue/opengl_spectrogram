@@ -3,19 +3,6 @@
 
 #include "JuceHeader.h"
 
-/** Vertex data to be passed to the shaders.
-    For the purposes of this demo, each vertex will have a 3D position, a colour and a
-    2D texture co-ordinate. Of course you can ignore these or manipulate them in the
-    shader programs but are some useful defaults to work from.
-    */
-struct Vertex
-{
-    float position[3];
-    float normal[3];
-    float colour[4];
-    float texCoord[2];
-};
-
 //==============================================================================
 // This class just manages the attributes that the demo shaders use.
 struct Attributes

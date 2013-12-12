@@ -97,7 +97,7 @@ void open_gl_component::renderOpenGL() {
 	const ScopedLock sl(wav_file_lock);
 	if (wav_file == nullptr)
 		return;
-
+    /*
     // Having used the juce 2D renderer, it will have messed-up a whole load of GL state, so
     // we need to initialise some important settings before doing our normal GL 3D drawing..
     glEnable (GL_DEPTH_TEST);
@@ -106,9 +106,10 @@ void open_gl_component::renderOpenGL() {
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     open_gl_context.extensions.glActiveTexture (GL_TEXTURE0);
     glEnable (GL_TEXTURE_2D);
+    */
 
     //glViewport (0, 0, roundToInt (desktopScale * getWidth()), roundToInt (desktopScale * getHeight()));
-    glViewport (0, 0, getWidth(), getHeight());
+    //glViewport (0, 0, getWidth(), getHeight());
 
 	// use shader
 	shader->use();
@@ -146,8 +147,8 @@ void open_gl_component::renderOpenGL() {
 		open_gl_context.extensions.glUniformMatrix4fv(uni->uniformID, 1, GL_FALSE, glm::value_ptr(texture_transform));
 	}
 
-	glClearColor(0.0, 0.0, 0.0, 0.0);
-	glClear(GL_COLOR_BUFFER_BIT);
+	//glClearColor(0.0, 0.0, 0.0, 0.0);
+	//glClear(GL_COLOR_BUFFER_BIT);
 
 	/* Set texture wrapping mode */
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT);
@@ -158,19 +159,21 @@ void open_gl_component::renderOpenGL() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolate ? GL_LINEAR : GL_NEAREST);
 
 	/* Draw the grid using the indices to our vertices using our vertex buffer objects */
-	attributes->enable(open_gl_context);
-	//open_gl_context.extensions.glEnableVertexAttribArray(attribute_coord2d);
-	open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-	//open_gl_context.extensions.glVertexAttribPointer(attribute_coord2d, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	if (OpenGLShaderProgram::Attribute* attr = attributes->coord2d) {
+        /* Draw the grid using the indices to our vertices using our vertex buffer objects */
+        open_gl_context.extensions.glEnableVertexAttribArray(attr->attributeID);
 
-	open_gl_context.extensions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
-	glDrawElements(GL_LINES, 100 * 101 * 4, GL_UNSIGNED_SHORT, 0);
+        open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+        open_gl_context.extensions.glVertexAttribPointer(attr->attributeID, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-	/* Stop using the vertex buffer object */
-	attributes->disable(open_gl_context);
-	//open_gl_context.extensions.glDisableVertexAttribArray(attribute_coord2d);
-	open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
-	open_gl_context.extensions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        open_gl_context.extensions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
+        glDrawElements(GL_LINES, 100 * 101 * 4, GL_UNSIGNED_SHORT, 0);
+
+        /* Stop using the vertex buffer object */
+        open_gl_context.extensions.glDisableVertexAttribArray(attr->attributeID);
+        open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
+        open_gl_context.extensions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    }
 
 	// swap gl buffers
 	open_gl_context.swapBuffers();
