@@ -27,7 +27,7 @@
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/Linux" extraLinkerFlags="-lGLEW -lGL">
+    <LINUX_MAKE targetFolder="Builds/Linux" extraLinkerFlags="-lm -lglut -lGLEW -lGL">
       <CONFIGURATIONS>
         <CONFIGURATION name="Debug" libraryPath="/usr/X11R6/lib/" isDebug="1" optimisation="1"
                        targetName="opengl_spectrogram"/>
