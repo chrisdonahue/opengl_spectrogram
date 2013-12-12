@@ -54,13 +54,18 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
 	// Create our datapoints, store it as bytes
     int num_frames = wav_file->get_num_frames();
     int num_bins_per_frame = wav_file->get_num_bins_per_frame();
-    GLbyte graph[num_frames][num_bins_per_frame];
+    GLbyte graph[num_frames][num_bins_per_frame - 1];
+    double fft_magnitude_min = wav_file->get_fft_magnitude_min();
+    double fft_magnitude_max = wav_file->get_fft_magnitude_max();
+    double m, b;
+    audio_util::map_ranged(fft_magnitude_min, fft_magnitude_max, -1.0, 1.0, &m, &b);
 
     for (int i = 0; i < num_frames; i++) {
         double* frame_magnitudes = wav_file->get_fft_magnitudes_frame(i);
-        for (int j = 0; j < num_bins_per_frame; j++) {
+        for (int j = 1; j < num_bins_per_frame; j++) {
             double bin_magnitude = frame_magnitudes[j];
-			graph[i][j] = roundf(bin_magnitude * 127 + 128);
+            double adjusted_bin_magnitude = (bin_magnitude * m) + b;
+			graph[i][j - 1] = roundf(adjusted_bin_magnitude * 127 + 128);
         }
     }
 
@@ -130,7 +135,7 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
 	glGenTextures(1, &texture_id);
 	glBindTexture(GL_TEXTURE_2D, texture_id);
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_per_frame, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_per_frame - 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
 
 	// Create two vertex buffer objects
 	glGenBuffers(2, vbo);

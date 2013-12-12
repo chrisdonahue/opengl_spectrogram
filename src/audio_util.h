@@ -37,6 +37,9 @@ namespace audio_util {
     extern void load_wav_file(std::string, int, int, float*);
     extern void load_wav_file(std::string, wav_data*);
 
+    // other helpers
+    extern void map_ranged(double, double, double, double, double*, double*);
+
     // class to hold a wave file
     class wav_data {
         public:
