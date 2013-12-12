@@ -21,8 +21,6 @@
         </GROUP>
       </GROUP>
       <FILE id="TuHXpc" name="graph.cpp" compile="1" resource="0" file="src/graph.cpp"/>
-      <FILE id="BhQ3Hz" name="graph.f.glsl" compile="0" resource="1" file="src/graph.f.glsl"/>
-      <FILE id="BSDyFT" name="graph.v.glsl" compile="0" resource="1" file="src/graph.v.glsl"/>
       <FILE id="B3DYIG" name="shader_utils.cpp" compile="1" resource="0"
             file="src/shader_utils.cpp"/>
       <FILE id="bfQPPQ" name="shader_utils.h" compile="0" resource="0" file="src/shader_utils.h"/>
@@ -42,6 +40,11 @@
         <MODULEPATH id="juce_audio_devices" path="~/JUCE"/>
         <MODULEPATH id="juce_audio_formats" path="~/JUCE"/>
         <MODULEPATH id="juce_audio_processors" path="~/JUCE"/>
+        <MODULEPATH id="juce_events" path="~/JUCE"/>
+        <MODULEPATH id="juce_gui_extra" path="~/JUCE"/>
+        <MODULEPATH id="juce_gui_basics" path="~/JUCE"/>
+        <MODULEPATH id="juce_data_structures" path="~/JUCE"/>
+        <MODULEPATH id="juce_graphics" path="~/JUCE"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2012 targetFolder="Builds/VisualStudio2012">
@@ -57,6 +60,11 @@
         <MODULEPATH id="juce_audio_formats" path="D:\My Code\JUCE"/>
         <MODULEPATH id="juce_audio_devices" path="D:\My Code\JUCE"/>
         <MODULEPATH id="juce_audio_basics" path="D:\My Code\JUCE"/>
+        <MODULEPATH id="juce_events" path="D:\My Code\JUCE"/>
+        <MODULEPATH id="juce_gui_extra" path="D:\My Code\JUCE"/>
+        <MODULEPATH id="juce_gui_basics" path="D:\My Code\JUCE"/>
+        <MODULEPATH id="juce_data_structures" path="D:\My Code\JUCE"/>
+        <MODULEPATH id="juce_graphics" path="D:\My Code\JUCE"/>
       </MODULEPATHS>
     </VS2012>
   </EXPORTFORMATS>
@@ -66,6 +74,11 @@
     <MODULES id="juce_audio_formats" showAllCode="1" useLocalCopy="1"/>
     <MODULES id="juce_audio_processors" showAllCode="1" useLocalCopy="1"/>
     <MODULES id="juce_core" showAllCode="1" useLocalCopy="1"/>
+    <MODULES id="juce_data_structures" showAllCode="1" useLocalCopy="1"/>
+    <MODULES id="juce_events" showAllCode="1" useLocalCopy="1"/>
+    <MODULES id="juce_graphics" showAllCode="1" useLocalCopy="1"/>
+    <MODULES id="juce_gui_basics" showAllCode="1" useLocalCopy="1"/>
+    <MODULES id="juce_gui_extra" showAllCode="1" useLocalCopy="1"/>
   </MODULES>
   <JUCEOPTIONS/>
 </JUCERPROJECT>
