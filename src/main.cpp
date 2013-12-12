@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "boost/program_options.hpp"
+
 #include <GL/glew.h>
 #include <GL/glut.h>
 
@@ -199,6 +201,42 @@ void free_resources() {
 }
 
 int main(int argc, char *argv[]) {
+    namespace po = boost::program_options;
+    
+    // containers for command line variables
+    int fft_size;
+    int fft_overlap;
+    std::string fft_window_type;
+    std::string vertex_shader_file_path;
+    std::string fragment_shader_file_path;
+    std::string audio_file_path;
+
+    // parse command line
+    po::options_description cl_desc("Allowed options");
+    cl_desc.add_options()
+        ("help", "display help message")
+        ("fft_size", po::value<int>(&(fft_size))->default_value(1024), "fft size")
+        ("fft_size", po::value<int>(&(fft_overlap))->default_value(0), "fft overlap")
+        ("fft_window_type", po::value<std::string>(&fft_window_type)->default_value("rectangle"), "fft window type")
+        ("vertex_shader_file_path", po::value<std::string>(&vertex_shader_file_path), "vertex shader file path")
+        ("fragment_shader_file_path", po::value<std::string>(&fragment_shader_file_path), "fragment shader file path")
+        ("audio_file_path", po::value<std::string>(&audio_file_path), "audio file path")
+    ;
+    po::variables_map cl_vm;
+    po::store(po::parse_command_line(argc, argv, cl_desc), cl_vm);
+    po::notify(cl_vm);
+    
+    // print help
+    if (cl_vm.count("help")) {
+        std::cout << cl_desc << std::endl;
+        return 1;
+    }
+    
+    // validate args
+    
+    // debug command line
+    std::cerr << fft_size << ", " << fft_overlap << ", " << fft_window_type << ", " << vertex_shader_file_path << ", " << fragment_shader_file_path << ", " << audio_file_path << std::endl;
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutInitWindowSize(640, 480);
