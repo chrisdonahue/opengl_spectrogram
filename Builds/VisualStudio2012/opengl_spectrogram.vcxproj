@@ -133,10 +133,10 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\main.cpp"/>
     <ClCompile Include="..\..\src\audio_util.cpp"/>
     <ClCompile Include="..\..\src\dependencies\kiss_fft130\kiss_fft.c"/>
     <ClCompile Include="..\..\src\dependencies\kiss_fft130\tools\kiss_fftr.c"/>
-    <ClCompile Include="..\..\src\graph.cpp"/>
     <ClCompile Include="..\..\src\shader_utils.cpp"/>
     <ClCompile Include="..\..\JuceLibraryCode\modules\juce_audio_basics\buffers\juce_AudioDataConverters.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>

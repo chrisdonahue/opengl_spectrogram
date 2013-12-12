@@ -5,6 +5,7 @@
               jucerVersion="3.1.0">
   <MAINGROUP id="jgyg2k" name="opengl_spectrogram">
     <GROUP id="{E854E665-2359-A844-7F2B-C39FFFE1E076}" name="src">
+      <FILE id="SlUwjT" name="main.cpp" compile="1" resource="0" file="src/main.cpp"/>
       <FILE id="w2LXAl" name="audio_util.cpp" compile="1" resource="0" file="src/audio_util.cpp"/>
       <FILE id="ht24nL" name="audio_util.h" compile="0" resource="0" file="src/audio_util.h"/>
       <GROUP id="{B67CADFC-7C39-4FF5-D049-2A97D9A81E44}" name="dependencies">
@@ -20,7 +21,6 @@
           </GROUP>
         </GROUP>
       </GROUP>
-      <FILE id="TuHXpc" name="graph.cpp" compile="1" resource="0" file="src/graph.cpp"/>
       <FILE id="B3DYIG" name="shader_utils.cpp" compile="1" resource="0"
             file="src/shader_utils.cpp"/>
       <FILE id="bfQPPQ" name="shader_utils.h" compile="0" resource="0" file="src/shader_utils.h"/>

@@ -49,10 +49,10 @@ ifeq ($(CONFIG),Release)
 endif
 
 OBJECTS := \
+  $(OBJDIR)/main_32e3b559.o \
   $(OBJDIR)/audio_util_af41dd2b.o \
   $(OBJDIR)/kiss_fft_1cb00a17.o \
   $(OBJDIR)/kiss_fftr_1769ff11.o \
-  $(OBJDIR)/graph_f53d38f8.o \
   $(OBJDIR)/shader_utils_7cbb8177.o \
   $(OBJDIR)/juce_audio_basics_2442e4ea.o \
   $(OBJDIR)/juce_audio_devices_a4c8a728.o \
@@ -84,6 +84,11 @@ strip:
 	@echo Stripping opengl_spectrogram
 	-@strip --strip-unneeded $(OUTDIR)/$(TARGET)
 
+$(OBJDIR)/main_32e3b559.o: ../../src/main.cpp
+	-@mkdir -p $(OBJDIR)
+	@echo "Compiling main.cpp"
+	@$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+
 $(OBJDIR)/audio_util_af41dd2b.o: ../../src/audio_util.cpp
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling audio_util.cpp"
@@ -98,11 +103,6 @@ $(OBJDIR)/kiss_fftr_1769ff11.o: ../../src/dependencies/kiss_fft130/tools/kiss_ff
 	-@mkdir -p $(OBJDIR)
 	@echo "Compiling kiss_fftr.c"
 	@$(CC) $(CFLAGS) -o "$@" -c "$<"
-
-$(OBJDIR)/graph_f53d38f8.o: ../../src/graph.cpp
-	-@mkdir -p $(OBJDIR)
-	@echo "Compiling graph.cpp"
-	@$(CXX) $(CXXFLAGS) -o "$@" -c "$<"
 
 $(OBJDIR)/shader_utils_7cbb8177.o: ../../src/shader_utils.cpp
 	-@mkdir -p $(OBJDIR)

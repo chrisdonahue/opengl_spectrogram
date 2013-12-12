@@ -274,6 +274,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\main.cpp">
+      <Filter>opengl_spectrogram\src</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\audio_util.cpp">
       <Filter>opengl_spectrogram\src</Filter>
     </ClCompile>
@@ -282,9 +285,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\dependencies\kiss_fft130\tools\kiss_fftr.c">
       <Filter>opengl_spectrogram\src\dependencies\kiss_fft130\tools</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\graph.cpp">
-      <Filter>opengl_spectrogram\src</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\shader_utils.cpp">
       <Filter>opengl_spectrogram\src</Filter>
