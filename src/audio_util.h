@@ -225,8 +225,9 @@ namespace audio_util {
 
     class wav_data_player : public juce::AudioIODeviceCallback {
     public: 
-        wav_data_player(const juce::CriticalSection& file_lock, wav_data* file, int num_frames_on_screen) :
-            file_lock(file_lock), file(file), num_frames_on_screen(num_frames_on_screen) {
+        wav_data_player(const juce::CriticalSection& file_lock, wav_data* file, int num_frames_on_screen, float compress_factor) :
+            file_lock(file_lock), file(file),
+            num_frames_on_screen(num_frames_on_screen), compress_factor(compress_factor) {
         	file_num_samples = file->get_num_samples();
         	file_samples = file->get_samples();
             file_num_frames = file->get_num_frames();
@@ -274,13 +275,17 @@ namespace audio_util {
 			//GLbyte graph[num_bins_per_frame - 1][num_frames];
 			double fft_magnitude_min = file->get_fft_magnitude_min();
 			double fft_magnitude_max = file->get_fft_magnitude_max();
+			double fft_magnitude_cieling = fft_magnitude_max * compress_factor;
 			double m, b;
-			audio_util::map_ranged(fft_magnitude_min, fft_magnitude_max, -1.0, 1.0, &m, &b);
+			audio_util::map_ranged(fft_magnitude_min, fft_magnitude_cieling, -1.0, 1.0, &m, &b);
 
 			for (int i = 0; i < num_frames; i++) {
 				double* frame_magnitudes = file->get_fft_magnitudes_frame(i);
 				for (int j = 1; j < num_bins_per_frame; j++) {
 				    double bin_magnitude = frame_magnitudes[j];
+				    if (bin_magnitude > fft_magnitude_cieling) {
+						bin_magnitude = fft_magnitude_cieling;
+					}
 				    double adjusted_bin_magnitude = (bin_magnitude * m) + b;
 				    //graph[j - 1][i] = roundf(adjusted_bin_magnitude * 127 + 128);
 					set_graph_data(j - 1, i, roundf(adjusted_bin_magnitude * 127 + 128));
@@ -369,6 +374,7 @@ namespace audio_util {
         int file_num_bins_per_frame;
         int file_num_samples_played;
         int num_frames_on_screen;
+        float compress_factor;
         GLbyte* graph;
         GLuint texture_id;
     };

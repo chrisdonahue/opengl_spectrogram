@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
     // create wav data player
     juce::ScopedPointer<juce::XmlElement> audio_state(device_manager.createStateXml());
     device_manager.initialise(0, 1, audio_state, true);
-    wav_file_player = new audio_util::wav_data_player(wav_file_lock, wav_file, 100);
+    wav_file_player = new audio_util::wav_data_player(wav_file_lock, wav_file, 100, 0.4f);
     device_manager.addAudioCallback(wav_file_player);
     
     // debug command line
