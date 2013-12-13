@@ -1,0 +1,104 @@
+<html>
+<head>
+<title>3D Spectrogram Visualizer</title>
+</head>
+
+<body>
+<center>
+	<h1>3D Spectrogram Visualizer</h1>
+	<h2>Chris Donahue</h2>
+	<h3>CS384G Final Project (Fall 2013)</h3>
+</center>
+<br>
+<center><img src="ss_3d_specgram.png"></img></center>
+<br>
+<h2>Introduction</h2>
+My final project is a 3D spectrogram visualizer created using OpenGL, GLEW, GLUT for the 3D graphics and display, and JUCE for the audio playback/file IO. A spectrogram is a visual representation of the Fourier transform of a signal over time. Spectrograms are typically visualized in two dimensions where the x dimension represents time and the y dimension represents the frequencies between 0 Hz and the Nyquist. Color intensity is usually employed as a third dimension to represent intensity of spectral energy at each frequency bin over time. Instead of or in addition to color, one could use a third spacial dimension to represent intensity of spectral energy.
+<br>
+<h2>Motivation</h2>
+Spectrograms can augment a music listening experience by visualizing a pictorial representation of the frequency information while the audio plays simultaneously. Such spectrogram "visualizers" typically scroll from right to left, where the right most edge represents the spectrum of the current audio signal and everything to the left is a spectral history. Some artists even embed audio in their songs that will look like recognizable pictures in a spectrogram visualizer. An example of this can be seen in the Aphex Twin track <i>Equation</i> from his Windowlicker EP.
+<br>
+<br>
+<center><img src="aphex_twin_equation_face.jpg"></img></center>
+<br>
+In order to see this face, one must be using a spectrogram with a logarithmic frequency axis. 2D spectrograms are fairly common visualizers but 3D spectrograms are far less common. I wanted to implement a 3D spectogram using JUCE to use as an assistive tool for music creation. JUCE is a multi-platform C++ audio toolkit that among other things can be used to create plug-ins for digital audio workstations. Implementing a 3D spectrogram in JUCE would allow artists to visualize their songs in the frequency domain in 3D in real time in any music creation software. Additional motivation stems from a desire to gain more practical knowledge of using OpenGL and GLSL.
+<br>
+<h2>Development</h2>
+I was initially using JUCE for the UI of this project. However, JUCE's OpenGL classes are not compatible with GLEW and I wanted to use GLEW to manage my VBO's and shader programs instead of JUCE's custom methods. The scrapped UI is displayed below.
+<br>
+<br>
+<center><img src="ss_scrapped_ui.png"></img></center>
+<br>
+I switched to GLUT and a command line interface to manage the graphics/options in order to expedite the creation of this project. The project ended up as a modified version of <a href="http://en.wikibooks.org/wiki/OpenGL_Programming/Scientific_OpenGL_Tutorial_04">this tutorial</a> on scientific programming in OpenGL. I used a program called Photosounder to create a debug audio file to use to test the correctness of my renders.
+<br>
+<center><img height="509" width="auto" src="ss_photosounder.png"></img><img src="ss_3d_okay.png"></img></center>
+<br>
+After establishing the correctness of my rendering system, I modified the keyboard scroll function from the OpenGL scientific programming tutorial to synchronize scrolling to the playing audio file.
+<br>
+<h2>Usage</h2>
+Options for <i>opengl_spectrogram</i> program:
+<br>
+<br>
+<table border="1">
+	<tr>
+		<th>Option Flag</th>
+		<th>Default Value</th>
+		<th>Description</th>
+	<tr>
+	<tr>
+		<td>--help</td>
+		<td></td>
+		<td>Displays help message</td>
+	<tr>
+	<tr>
+		<td>--fft_size</td>
+		<td>1024</td>
+		<td>Sets the size of the FFT window</td>
+	<tr>
+	<tr>
+		<td>--fft_overlap</td>
+		<td>0</td>
+		<td>Sets the number of sample overlap for sequential FFT windows</td>
+	<tr>
+	<tr>
+		<td>--fft_window_type</td>
+		<td>rectangle</td>
+		<td>Sets the window function for the FFT, can be "rectangle" or "hanning" currently</td>
+	<tr>
+	<tr>
+		<td>--display_compression</td>
+		<td>1.0</td>
+		<td>Compresses the display of the FFT. Sets a hard cieling on spectral energy at this value times the max energy at any bin in the frequency-time domain. Other values are linearly scaled towards this cieling.</td>
+	<tr>
+	<tr>
+		<td>--spectrum_display_percent</td>
+		<td>1.0</td>
+		<td>Changes the amount of frequency bins to display to this value times the number of FFT output bins. Useful for creating better visualizations in a linear scale. Will be less useful once logarithmic frequency axis functionality is implemented.</td>
+	<tr>
+	<tr>
+		<td>--vertex_shader_file_path</td>
+		<td><b>REQUIRED</b></td>
+		<td>Path to the GLSL file to use as the vertex shader</td>
+	<tr>
+	<tr>
+		<td>--fragment_shader_file_path</td>
+		<td><b>REQUIRED</b></td>
+		<td>Path to the GLSL file to use as the fragment shader</td>
+	<tr>
+	<tr>
+		<td>--audio_file_path</td>
+		<td><b>REQUIRED</b></td>
+		<td>Path to the audio file to play/visualize (currently must be a WAV file)</td>
+	<tr>
+<table>
+<br>
+<h2>Known Issues</h2>
+For some reason when the texture representing the spectral information is scrolling the spectral history (which should be static) seems to jump around and vary. I am not entirely sure what the cause of this is, but I am looking into it and it will be fixed in a later release. Additionally, I am looking in to support for logarithmic frequency axis and different input audio formats. Finally, this software is currently only tested on Linux.
+<br>
+<h2>Links</h2>
+<a href="https://github.com/chrisdonahue/opengl_spectrogram">Source Code (github)</a><br>
+<a href="http://www.juce.com/">JUCE Home Page</a><br>
+<a href="http://kissfft.sourceforge.net/">Kiss FFT</a><br>
+<a href="http://en.wikibooks.org/wiki/OpenGL_Programming/Scientific_OpenGL_Tutorial_04">OpenGL Scientific Programming Tutorial</a><br>
+</body>
+</html>
