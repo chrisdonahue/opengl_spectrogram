@@ -12,6 +12,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "JuceHeader.h"
+
 #include "audio_util.h"
 #include "shader_utils.h"
 
@@ -20,11 +22,13 @@ GLuint program;
 GLint attribute_coord2d;
 GLint uniform_vertex_transform;
 GLint uniform_texture_transform;
-GLuint texture_id;
 GLint uniform_mytexture;
 
 // wav file
+juce::CriticalSection wav_file_lock;
+juce::AudioDeviceManager device_manager;
 audio_util::wav_data* wav_file;
+audio_util::wav_data_player* wav_file_player;
 
 // model variables
 float offset_x = 0.0;
@@ -32,12 +36,11 @@ float offset_y = 0.0;
 float scale = 1.0;
 
 // display settings
-bool interpolate = false;
+bool interpolate = true;
 bool clamp = true;
 bool rotate = false;
 
 // model state
-//GLbyte* graph
 GLuint vbo[2];
 
 int init_resources(std::string vert_shader_file_path, std::string frag_shader_file_path) {
@@ -52,94 +55,9 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
 
 	if (attribute_coord2d == -1 || uniform_vertex_transform == -1 || uniform_texture_transform == -1 || uniform_mytexture == -1)
 		return 0;
-
-	// Create our datapoints, store it as bytes
-    int num_frames = wav_file->get_num_frames();
-    int num_bins_per_frame = wav_file->get_num_bins_per_frame();
-    //GLbyte graph[num_frames][num_bins_per_frame - 1];
-    GLbyte graph[num_bins_per_frame - 1][num_frames];
-    double fft_magnitude_min = wav_file->get_fft_magnitude_min();
-    double fft_magnitude_max = wav_file->get_fft_magnitude_max();
-    double m, b;
-    audio_util::map_ranged(fft_magnitude_min, fft_magnitude_max, -1.0, 1.0, &m, &b);
-
-    for (int i = 0; i < num_frames; i++) {
-        double* frame_magnitudes = wav_file->get_fft_magnitudes_frame(i);
-        for (int j = 1; j < num_bins_per_frame; j++) {
-            double bin_magnitude = frame_magnitudes[j];
-            double adjusted_bin_magnitude = (bin_magnitude * m) + b;
-			//graph[i][j - 1] = roundf(adjusted_bin_magnitude * 127 + 128);
-			graph[j - 1][i] = roundf(adjusted_bin_magnitude * 127 + 128);
-        }
-    }
-
-    /*
-#define N 16
-	GLbyte graph[N][N];
-
-    // calculate data ranges
-    float x_min = std::numeric_limits<float>::infinity();
-    float x_max = std::numeric_limits<float>::infinity() * -1.0f;
-    float y_min = std::numeric_limits<float>::infinity();
-    float y_max = std::numeric_limits<float>::infinity() * -1.0f;
-    float d_min = std::numeric_limits<float>::infinity();
-    float d_max = std::numeric_limits<float>::infinity() * -1.0f;
-    float z_min = std::numeric_limits<float>::infinity();
-    float z_max = std::numeric_limits<float>::infinity() * -1.0f;
-    int g_min = std::numeric_limits<int>::max();
-    int g_max = std::numeric_limits<int>::min();
-
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N; j++) {
-            // map i, j from -1.0 to 1.0
-			float x = (i - N / 2) / (N / 2.0);
-			float y = (j - N / 2) / (N / 2.0);
-			float d = hypotf(x, y) * 4.0;
-			float z = (1 - d * d) * expf(d * d / -2.0);
-            
-			graph[i][j] = roundf(z * 127 + 128);
-            int g = (int) graph[i][j];
-            
-            // calculate ranges
-            if (x < x_min)
-                x_min = x;
-            if (x > x_max)
-                x_max = x;
-            if (y < y_min)
-                y_min = y;
-            if (y > y_max)
-                y_max = y;
-            if (d < d_min)
-                d_min = d;
-            if (d > d_max)
-                d_max = d;
-            if (z < z_min)
-                z_min = z;
-            if (z > z_max)
-                z_max = z;
-            if (g < g_min)
-                g_min = g;
-            if (g > g_max)
-                g_max = g;
-
-            std::cerr << "(" << i << ", " << j << ") -> (" << x << ", " << y << ", " << z << "): " << (int) graph[i][j] << std::endl;
-		}
-	}
-
-    // print ranges
-    std::cerr << "x: [" << x_min << ", " << x_max << "]" << std::endl;
-    std::cerr << "y: [" << y_min << ", " << y_max << "]" << std::endl;
-    std::cerr << "d: [" << d_min << ", " << d_max << "]" << std::endl;
-    std::cerr << "z: [" << z_min << ", " << z_max << "]" << std::endl;
-    std::cerr << "g: [" << g_min << ", " << g_max << "]" << std::endl;
-    */
-
-	/* Upload the texture with our datapoints */
-	glActiveTexture(GL_TEXTURE0);
-	glGenTextures(1, &texture_id);
-	glBindTexture(GL_TEXTURE_2D, texture_id);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_per_frame - 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
+		
+	// init gfx resources for wav data player
+	wav_file_player->init_gfx_resources();
 
 	// Create two vertex buffer objects
 	glGenBuffers(2, vbo);
@@ -183,6 +101,8 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
 }
 
 void display() {
+	const juce::ScopedLock sl(wav_file_lock);
+
 	glUseProgram(program);
 	glUniform1i(uniform_mytexture, 0);
 
@@ -333,8 +253,15 @@ int main(int argc, char *argv[]) {
     // load wav file
     wav_file = new audio_util::wav_data(audio_file_path);
 
-    // compuate wav file FFT
+    // compute wav file FFT
     wav_file->perform_fft(fft_size, fft_overlap, fft_window_type);
+
+    // create wav data player
+    juce::ScopedPointer<juce::XmlElement> audio_state(device_manager.createStateXml());
+    device_manager.initialise(0, 1, audio_state, true);
+    //device_manager.playTestSound();
+    wav_file_player = new audio_util::wav_data_player(wav_file_lock, wav_file, 100);
+    device_manager.addAudioCallback(wav_file_player);
     
     // debug command line
     std::cerr << "Displaying FFT of " << audio_file_path << " with size " << fft_size << ", overlap " << fft_overlap << ", and window type " << fft_window_type << "." << std::endl;
@@ -343,7 +270,7 @@ int main(int argc, char *argv[]) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutInitWindowSize(640, 480);
-	glutCreateWindow("My Graph");
+	glutCreateWindow("3D FFT");
 
 	GLenum glew_status = glewInit();
 
@@ -380,5 +307,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	free_resources();
+
+    delete wav_file;
+    delete wav_file_player;
 	return 0;
 }
