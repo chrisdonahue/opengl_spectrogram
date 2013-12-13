@@ -247,7 +247,7 @@ namespace audio_util {
 			
 			num_bins_on_screen = (int) (file_num_bins_per_frame - 1) * spectrum_display_percent;
 			
-            texture = (GLbyte*) malloc(sizeof(GLbyte) * (file_num_bins_per_frame - 1) * file_num_frames);
+            texture = (GLbyte*) malloc(sizeof(GLbyte) * (num_bins_on_screen) * file_num_frames);
         }
         
         ~wav_data_player() {
@@ -307,14 +307,14 @@ namespace audio_util {
 			// init data array of GLbytes
 			for (int i = 0; i < num_frames; i++) {
 				double* frame_magnitudes = file->get_fft_magnitudes_frame(i);
-				for (int j = 1; j < num_bins_per_frame; j++) {
-				    double bin_magnitude = frame_magnitudes[j];
+				for (int j = 0; j < num_bins_on_screen; j++) {
+				    double bin_magnitude = frame_magnitudes[j + 1];
 				    if (bin_magnitude > fft_magnitude_cieling) {
 						bin_magnitude = fft_magnitude_cieling;
 					}
 				    double adjusted_bin_magnitude = (bin_magnitude * m) + b;
 				    //graph[j - 1][i] = roundf(adjusted_bin_magnitude * 127 + 128);
-					set_texture_data(j - 1, i, roundf(adjusted_bin_magnitude * 127 + 128));
+					set_texture_data(j, i, roundf(adjusted_bin_magnitude * 127 + 128));
 				}
 			}
 
@@ -322,7 +322,7 @@ namespace audio_util {
 			glActiveTexture(GL_TEXTURE0);
 			glGenTextures(1, &texture_id);
 			glBindTexture(GL_TEXTURE_2D, texture_id);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_per_frame - 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_on_screen, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture);
         } 
 
         void set_texture_data(int i, int j, GLbyte b) {
