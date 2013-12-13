@@ -9,12 +9,12 @@ set -e
     --fft_size 1024 \
     --fft_overlap 0 \
     --fft_window_type hanning \
-    --display_compression 1.0 \
-    --spectrum_display_percent 1.0 \
+    --display_compression 0.75 \
+    --spectrum_display_percent 0.05 \
     --vertex_shader_file_path ./shaders/graph.v.glsl \
     --fragment_shader_file_path ./shaders/graph.f.glsl \
-    --audio_file_path ./audio/debug_photosounder_okay.wav 
-#    --audio_file_path ./audio/aphex_twin_pulsewidth.wav 
+    --audio_file_path ./audio/aphex_twin_pulsewidth.wav 
+#    --audio_file_path ./audio/debug_photosounder_okay.wav 
 #    --audio_file_path ./audio/aphex_twin_equation_face.wav 
 #    --audio_file_path ./audio/valve_intro.wav 
 #COMMENT
