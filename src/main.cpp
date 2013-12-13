@@ -31,7 +31,7 @@ audio_util::wav_data* wav_file;
 audio_util::wav_data_player* wav_file_player;
 
 // model variables
-float offset_x = 0.0;
+float offset_x = -2.0;
 float offset_y = 0.0;
 float scale = 1.0;
 
@@ -165,11 +165,12 @@ void special(int key, int x, int y) {
 		rotate = !rotate;
 		printf("Rotation is now %s\n", rotate ? "on" : "off");
 		break;
-    /*
 	case GLUT_KEY_LEFT:
+		std::cout << offset_x << std::endl;
 		offset_x -= 0.03;
 		break;
 	case GLUT_KEY_RIGHT:
+		std::cout << offset_x << std::endl;
 		offset_x += 0.03;
 		break;
 	case GLUT_KEY_UP:
@@ -178,7 +179,6 @@ void special(int key, int x, int y) {
 	case GLUT_KEY_DOWN:
 		offset_y -= 0.03;
 		break;
-    */
 	case GLUT_KEY_PAGE_UP:
 		scale *= 1.5;
 		break;
@@ -206,6 +206,8 @@ int main(int argc, char *argv[]) {
     int fft_size;
     int fft_overlap;
     std::string fft_window_type;
+    float compression;
+    float spectrum_display_percent;
     std::string vertex_shader_file_path;
     std::string fragment_shader_file_path;
     std::string audio_file_path;
@@ -217,6 +219,8 @@ int main(int argc, char *argv[]) {
         ("fft_size", po::value<int>(&(fft_size))->default_value(1024), "fft size")
         ("fft_overlap", po::value<int>(&(fft_overlap))->default_value(0), "fft overlap")
         ("fft_window_type", po::value<std::string>(&fft_window_type)->default_value("rectangle"), "fft window type")
+        ("display_compression", po::value<float>(&compression)->default_value(1.0f), "compress fft display, lower value is more compression")
+        ("spectrum_display_percent", po::value<float>(&spectrum_display_percent)->default_value(1.0f), "display a percentage of the spectrum, useful for throwing out boring top end")
         ("vertex_shader_file_path", po::value<std::string>(&vertex_shader_file_path), "vertex shader file path")
         ("fragment_shader_file_path", po::value<std::string>(&fragment_shader_file_path), "fragment shader file path")
         ("audio_file_path", po::value<std::string>(&audio_file_path), "audio file path")
@@ -259,8 +263,7 @@ int main(int argc, char *argv[]) {
     // create wav data player
     juce::ScopedPointer<juce::XmlElement> audio_state(device_manager.createStateXml());
     device_manager.initialise(0, 1, audio_state, true);
-    wav_file_player = new audio_util::wav_data_player(wav_file_lock, wav_file, 100, 0.4f);
-    device_manager.addAudioCallback(wav_file_player);
+    wav_file_player = new audio_util::wav_data_player(wav_file_lock, wav_file, 100, compression, spectrum_display_percent, &offset_x);
     
     // debug command line
     std::cerr << "Displaying FFT of " << audio_file_path << " with size " << fft_size << ", overlap " << fft_overlap << ", and window type " << fft_window_type << "." << std::endl;
@@ -298,6 +301,7 @@ int main(int argc, char *argv[]) {
 	printf("Press F2 to toggle clamping.\n");
 	printf("Press F3 to toggle rotation.\n");
 
+    device_manager.addAudioCallback(wav_file_player);
 	if (init_resources(vertex_shader_file_path, fragment_shader_file_path)) {
 		glutDisplayFunc(display);
 		glutIdleFunc(display);

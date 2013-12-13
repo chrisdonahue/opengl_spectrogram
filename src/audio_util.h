@@ -230,9 +230,11 @@ namespace audio_util {
 
     class wav_data_player : public juce::AudioIODeviceCallback {
     public: 
-        wav_data_player(const juce::CriticalSection& file_lock, wav_data* file, int num_frames_on_screen, float compress_factor) :
+        wav_data_player(const juce::CriticalSection& file_lock, wav_data* file, int num_frames_on_screen, float compress_factor, float spectrum_display_percent, float* offset_x) :
             file_lock(file_lock), file(file),
-            num_frames_on_screen(num_frames_on_screen), compress_factor(compress_factor) {
+            num_frames_on_screen(num_frames_on_screen), compress_factor(compress_factor),
+            spectrum_display_percent(spectrum_display_percent),
+            offset_x(offset_x) {
         	file_num_samples = file->get_num_samples();
         	file_samples = file->get_samples();
         	file_num_samples_played = 0;
@@ -243,18 +245,18 @@ namespace audio_util {
 			file_fft_magnitude_min = file->get_fft_magnitude_min();
 			file_fft_magnitude_max = file->get_fft_magnitude_max();
 			
-            texture = (GLbyte*) malloc(sizeof(GLbyte) * (file_num_bins_per_frame - 1) * num_frames_on_screen);
-            data = (GLbyte*) malloc(sizeof(GLbyte) * (file_num_bins_per_frame - 1) * file_num_frames);
-            blank_frame = (GLbyte*) malloc(sizeof(GLbyte) * (file_num_bins_per_frame - 1));
+			num_bins_on_screen = (int) (file_num_bins_per_frame - 1) * spectrum_display_percent;
+			
+            texture = (GLbyte*) malloc(sizeof(GLbyte) * (file_num_bins_per_frame - 1) * file_num_frames);
         }
         
         ~wav_data_player() {
             free(texture);
-            free(data);
-            free(blank_frame);
         }
         
         void audioDeviceIOCallback(const float **inputChannelData, int numInputChannels, float **outputChannelData, int numOutputChannels, int numSamples) {
+			const juce::ScopedLock sl(file_lock);
+        
 			// fill audio buffer
 			bool silence = file_num_samples_played >= file_num_samples;
         	for (int i = 0; i < numOutputChannels; i++) {
@@ -276,27 +278,8 @@ namespace audio_util {
         	
         	// scroll visualizer
        		int num_fft_frames_completed = file_num_samples_played / file_fft_size;
-       		int num_gfx_frames_filled = 0;
-       		while (num_gfx_frames_filled < num_frames_on_screen - num_fft_frames_completed) {
-				// blank out gfx position num_gfx_frames_filled
-				set_texture_frame(num_gfx_frames_filled, blank_frame);
-				num_gfx_frames_filled++;
-			}
-			//std::cerr << "TOTAL: " << file_num_frames << ", blank: " << num_gfx_frames_filled << ", ";
-			int num_completed_frames_displayed = 0;
-			while (num_gfx_frames_filled < num_frames_on_screen) {
-				// copy frame num_completed_frames_displayed to gfx position num_gfx_frames_filled
-				set_texture_frame(num_gfx_frames_filled, get_fft_frame_gfx(num_gfx_frames_filled));
-				num_gfx_frames_filled++;
-				num_completed_frames_displayed++;
-			}
-			//std::cerr << " filled: " << num_completed_frames_displayed << std::endl;
-        	
-			/* Upload the texture with our datapoints */
-			glActiveTexture(GL_TEXTURE0);
-			glGenTextures(1, &texture_id);
-			glBindTexture(GL_TEXTURE_2D, texture_id);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames_on_screen, file_num_bins_per_frame - 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture);
+       		float offset_per_frame = 2.0f / float(file_num_frames);
+       		*offset_x = -2.0f + (num_fft_frames_completed * offset_per_frame);
         }
         
         void audioDeviceAboutToStart(AudioIODevice *device) {
@@ -331,50 +314,19 @@ namespace audio_util {
 					}
 				    double adjusted_bin_magnitude = (bin_magnitude * m) + b;
 				    //graph[j - 1][i] = roundf(adjusted_bin_magnitude * 127 + 128);
-					set_fft_data_gfx(i, j - 1, roundf(adjusted_bin_magnitude * 127 + 128));
+					set_texture_data(j - 1, i, roundf(adjusted_bin_magnitude * 127 + 128));
 				}
-			}
-			
-			// make blank frame
-			for (int i = 0; i < num_bins_per_frame - 1; i++) {
-				double bin_magnitude = -1.0;
-				blank_frame[i] = roundf(bin_magnitude * 127 + 128);
-			}
-			
-			// init scrolling texture buffer
-			for (int i = 0; i < num_frames_on_screen; i++) {
-				set_texture_frame(i, blank_frame);
-				/*
-				for (int j = 1; j < num_bins_per_frame; j++) {
-					double bin_magnitude = -1.0;
-					set_texture_data(j - 1, i, roundf(bin_magnitude * 127 + 128));
-				}
-				*/
 			}
 
 			/* Upload the texture with our datapoints */
-			//glActiveTexture(GL_TEXTURE0);
-			//glGenTextures(1, &texture_id);
-			//glBindTexture(GL_TEXTURE_2D, texture_id);
-			//glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames_on_screen, num_bins_per_frame - 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture);
+			glActiveTexture(GL_TEXTURE0);
+			glGenTextures(1, &texture_id);
+			glBindTexture(GL_TEXTURE_2D, texture_id);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, num_frames, num_bins_per_frame - 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, texture);
         } 
-        
-        void set_fft_data_gfx(int frame_num, int bin_num, GLbyte b) {
-        	*(data + (frame_num * (file_num_bins_per_frame - 1)) + bin_num) = b;
-        }
-        
-        GLbyte* get_fft_frame_gfx(int frame_num) {
-			return (data + (frame_num * (file_num_bins_per_frame - 1)));
-		}
 
         void set_texture_data(int i, int j, GLbyte b) {
-        	*(texture + (i * num_frames_on_screen) + j) = b;
-        }
-        
-        void set_texture_frame(int frame_num, GLbyte* frame) {
-        	for (int i = 0; i < file_num_bins_per_frame - 1; i++) {
-				set_texture_data(i, frame_num, frame[i]);
-			}
+        	*(texture + (i * file_num_frames) + j) = b;
         }
         
     private:
@@ -396,11 +348,12 @@ namespace audio_util {
         
         // gfx state
         int num_frames_on_screen;
+        int num_bins_on_screen;
         float compress_factor;
-        GLbyte* data;
-        GLbyte* blank_frame;
+        float spectrum_display_percent;
         GLbyte* texture;
         GLuint texture_id;
+        float* offset_x;
     };
 }
 
