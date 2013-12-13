@@ -13,7 +13,7 @@
 <center><img src="ss_3d_specgram.png"></img></center>
 <br>
 <h2>Introduction</h2>
-My final project is a 3D spectrogram visualizer created using OpenGL, GLEW, GLUT for the 3D graphics and display, and JUCE for the audio playback/file IO. A spectrogram is a visual representation of the Fourier transform of a signal over time. Spectrograms are typically visualized in two dimensions where the x dimension represents time and the y dimension represents the frequencies between 0 Hz and the Nyquist. Color intensity is usually employed as a third dimension to represent intensity of spectral energy at each frequency bin over time. Instead of or in addition to color, one could use a third spacial dimension to represent intensity of spectral energy.
+My final project is a 3D spectrogram visualizer created using OpenGL, GLEW, GLUT for the 3D graphics and display, KissFFT for an implementation of the FFT algorithm and JUCE for audio playback/file IO. A spectrogram is a visual representation of the Fourier transform of a signal over time. Spectrograms are typically visualized in two dimensions where the x dimension represents time and the y dimension represents the frequencies between 0 Hz and the Nyquist. Color intensity is usually employed as a third dimension to represent intensity of spectral energy at each frequency bin over time. Instead of or in addition to color, one could use a third spacial dimension to represent intensity of spectral energy.
 <br>
 <h2>Motivation</h2>
 Spectrograms can augment a music listening experience by visualizing a pictorial representation of the frequency information while the audio plays simultaneously. Such spectrogram "visualizers" typically scroll from right to left, where the right most edge represents the spectrum of the current audio signal and everything to the left is a spectral history. Some artists even embed audio in their songs that will look like recognizable pictures in a spectrogram visualizer. An example of this can be seen in the Aphex Twin track <i>Equation</i> from his Windowlicker EP.
@@ -29,7 +29,7 @@ I was initially using JUCE for the UI of this project. However, JUCE's OpenGL cl
 <br>
 <center><img src="ss_scrapped_ui.png"></img></center>
 <br>
-I switched to GLUT and a command line interface to manage the graphics/options in order to expedite the creation of this project. The project ended up as a modified version of <a href="http://en.wikibooks.org/wiki/OpenGL_Programming/Scientific_OpenGL_Tutorial_04">this tutorial</a> on scientific programming in OpenGL. I used a program called Photosounder to create a debug audio file to use to test the correctness of my renders.
+I switched to GLUT and a command line interface to manage the graphics/options in order to expedite the creation of this project. The project ended up as a modified version of <a href="http://en.wikibooks.org/wiki/OpenGL_Programming/Scientific_OpenGL_Tutorial_04">this tutorial</a> on scientific programming in OpenGL. I used a program called Photosounder to create a <a href="debug_photosounder_okay.wav">debug audio file</a> to use to test the correctness of my renders.
 <br>
 <center><img height="509" width="auto" src="ss_photosounder.png"></img><img src="ss_3d_okay.png"></img></center>
 <br>
