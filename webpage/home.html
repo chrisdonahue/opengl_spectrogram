@@ -6,7 +6,7 @@
 <body>
 <center>
 	<h1>3D Spectrogram Visualizer</h1>
-	<h2>Chris Donahue</h2>
+	<h2>Chris Donahue (cjd947)</h2>
 	<h3>CS384G Fall 2013 Final Project</h3>
 </center>
 <br>
@@ -24,7 +24,7 @@ Spectrograms can augment a music listening experience by visualizing a pictorial
 In order to see this face, one must be using a spectrogram with a logarithmic frequency axis. 2D spectrograms are fairly common visualizers but 3D spectrograms are far less common. I wanted to implement a 3D spectogram using JUCE to use as an assistive tool for music creation. JUCE is a multi-platform C++ audio toolkit that among other things can be used to create plug-ins for digital audio workstations. Implementing a 3D spectrogram in JUCE would allow artists to visualize their songs in the frequency domain in 3D in real time in any music creation software. Additional motivation stems from a desire to gain more practical knowledge of using OpenGL and GLSL.
 <br>
 <h2>Development</h2>
-I was initially using JUCE for the UI of this project. However, JUCE's OpenGL classes are not compatible with GLEW and I wanted to use GLEW to manage my VBO's and shader programs instead of JUCE's custom methods. The scrapped UI is displayed below.
+I was initially using JUCE for the UI of this project. However, JUCE's OpenGL classes are not compatible with GLEW and I wanted to use GLEW to manage my VBO's and shader programs instead of JUCE's custom methods. A scrapped JUCE UI is displayed below.
 <br>
 <br>
 <center><img src="ss_scrapped_ui.png"></img></center>
@@ -92,8 +92,11 @@ Options for <i>opengl_spectrogram</i> program:
 	<tr>
 <table>
 <br>
-<h2>Known Issues</h2>
-For some reason when the texture representing the spectral information is scrolling the spectral history (which should be static) seems to jump around and vary. I am not entirely sure what the cause of this is, but I am looking into it and it will be fixed in a later release. Additionally, I am looking in to support for logarithmic frequency axis and different input audio formats. Finally, this software is currently only tested on Linux.
+<h2>Summary of Accomplishments</h2>
+Used OpenGL and other technologies to create a synchronized, scrolling 3D spectrogram to visualize an audio file. Created command line interface to change various visualization options. Learned loads about scientific computing using OpenGL, knowledge that will be extremely useful for my research efforts in the future.
+<br>
+<h2>Known Issues and Future Work</h2>
+When the texture representing the spectral energy is scrolling, the spectral history (which should be static) seems to jump around and vary. I am not entirely sure what is causing this, but I am looking into it and it will be fixed in a later release. Additionally, I am looking in to support for logarithmic frequency axis and different input audio formats. Eventually I would like this software to be able to visualize FFT data of real-time audio input for use as a plug-in for digitial audio workstations. Finally, this software is currently only tested on Linux.
 <br>
 <h2>Artifact</h2>
 Used TechSmith Jing to capture a short, (low FPS) video of my spectrogram visualizer playing the Aphex Twin track <i>Pulsewidth</i>.
