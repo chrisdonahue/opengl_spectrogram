@@ -33,9 +33,11 @@ float scale = 1.0;
 
 // display settings
 bool interpolate = false;
-bool clamp = false;
+bool clamp = true;
 bool rotate = false;
 
+// model state
+//GLbyte* graph
 GLuint vbo[2];
 
 int init_resources(std::string vert_shader_file_path, std::string frag_shader_file_path) {
@@ -54,7 +56,8 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
 	// Create our datapoints, store it as bytes
     int num_frames = wav_file->get_num_frames();
     int num_bins_per_frame = wav_file->get_num_bins_per_frame();
-    GLbyte graph[num_frames][num_bins_per_frame - 1];
+    //GLbyte graph[num_frames][num_bins_per_frame - 1];
+    GLbyte graph[num_bins_per_frame - 1][num_frames];
     double fft_magnitude_min = wav_file->get_fft_magnitude_min();
     double fft_magnitude_max = wav_file->get_fft_magnitude_max();
     double m, b;
@@ -65,7 +68,8 @@ int init_resources(std::string vert_shader_file_path, std::string frag_shader_fi
         for (int j = 1; j < num_bins_per_frame; j++) {
             double bin_magnitude = frame_magnitudes[j];
             double adjusted_bin_magnitude = (bin_magnitude * m) + b;
-			graph[i][j - 1] = roundf(adjusted_bin_magnitude * 127 + 128);
+			//graph[i][j - 1] = roundf(adjusted_bin_magnitude * 127 + 128);
+			graph[j - 1][i] = roundf(adjusted_bin_magnitude * 127 + 128);
         }
     }
 
@@ -241,6 +245,7 @@ void special(int key, int x, int y) {
 		rotate = !rotate;
 		printf("Rotation is now %s\n", rotate ? "on" : "off");
 		break;
+    /*
 	case GLUT_KEY_LEFT:
 		offset_x -= 0.03;
 		break;
@@ -253,6 +258,7 @@ void special(int key, int x, int y) {
 	case GLUT_KEY_DOWN:
 		offset_y -= 0.03;
 		break;
+    */
 	case GLUT_KEY_PAGE_UP:
 		scale *= 1.5;
 		break;
@@ -360,11 +366,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	//printf("Use left/right/up/down to move.\n");
-	//printf("Use pageup/pagedown to change the horizontal scale.\n");
-	//printf("Press home to reset the position and scale.\n");
-	//printf("Press F1 to toggle interpolation.\n");
-	//printf("Press F2 to toggle clamping.\n");
-	//printf("Press F3 to toggle rotation.\n");
+	printf("Use pageup/pagedown to change the horizontal scale.\n");
+	printf("Press home to reset the position and scale.\n");
+	printf("Press F1 to toggle interpolation.\n");
+	printf("Press F2 to toggle clamping.\n");
+	printf("Press F3 to toggle rotation.\n");
 
 	if (init_resources(vertex_shader_file_path, fragment_shader_file_path)) {
 		glutDisplayFunc(display);

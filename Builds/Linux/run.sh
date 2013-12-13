@@ -6,12 +6,13 @@ set -e
 #valgrind --tool=callgrind \
 #gdb --args \
 ./build/opengl_spectrogram \
-    --fft_size 1024 \
-    --fft_overlap 0 \
+    --fft_size 2048 \
+    --fft_overlap 1024 \
     --fft_window_type hanning \
     --vertex_shader_file_path ./shaders/graph.v.glsl \
     --fragment_shader_file_path ./shaders/graph.f.glsl \
-    --audio_file_path ./audio/valve_intro.wav 
+    --audio_file_path ./audio/debug_photosounder_okay.wav 
+#    --audio_file_path ./audio/debug_photosounder_okay.wav 
 #COMMENT
 
 # DEBUG MEMORY
