@@ -9,8 +9,8 @@ set -e
     --fft_size 1024 \
     --fft_overlap 0 \
     --fft_window_type hanning \
-    --display_compression 0.8 \
-    --spectrum_display_percent 0.2 \
+    --display_compression 0.7 \
+    --spectrum_display_percent 0.1 \
     --vertex_shader_file_path ./shaders/graph.v.glsl \
     --fragment_shader_file_path ./shaders/white.f.glsl \
     --audio_file_path ./audio/thelonius_monk_getting_sentimental.wav 
