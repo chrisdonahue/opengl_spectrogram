@@ -10,13 +10,11 @@ set -e
     --fft_overlap 0 \
     --fft_window_type hanning \
     --display_compression 0.8 \
-    --spectrum_display_percent 0.17 \
+    --spectrum_display_percent 1.0 \
     --vertex_shader_file_path ./shaders/graph.v.glsl \
     --fragment_shader_file_path ./shaders/graph.f.glsl \
-    --audio_file_path ./audio/aphex_twin_pulsewidth.wav 
-#    --audio_file_path ./audio/debug_photosounder_okay.wav 
-#    --audio_file_path ./audio/aphex_twin_equation_face.wav 
-#    --audio_file_path ./audio/valve_intro.wav 
+    --audio_file_path ./audio/debug_photosounder_okay.wav 
+#    --audio_file_path ~/windows/3d_specgram/robin_message.wav 
 #COMMENT
 
 # DEBUG MEMORY
