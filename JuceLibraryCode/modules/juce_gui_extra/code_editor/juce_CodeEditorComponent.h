@@ -2,28 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_CODEEDITORCOMPONENT_H_INCLUDED
-#define JUCE_CODEEDITORCOMPONENT_H_INCLUDED
+namespace juce
+{
 
 class CodeTokeniser;
 
@@ -34,10 +35,12 @@ class CodeTokeniser;
 
     This is designed to handle syntax highlighting and fast editing of very large
     files.
+
+    @tags{GUI}
 */
-class JUCE_API  CodeEditorComponent   : public Component,
-                                        public ApplicationCommandTarget,
-                                        public TextInputTarget
+class JUCE_API  CodeEditorComponent   : public TextInputTarget,
+                                        public Component,
+                                        public ApplicationCommandTarget
 {
 public:
     //==============================================================================
@@ -53,7 +56,7 @@ public:
                          CodeTokeniser* codeTokeniser);
 
     /** Destructor. */
-    ~CodeEditorComponent();
+    ~CodeEditorComponent() override;
 
     //==============================================================================
     /** Returns the code document that this component is editing. */
@@ -89,8 +92,8 @@ public:
     /** Returns the current caret position. */
     CodeDocument::Position getCaretPos() const                  { return caretPos; }
 
-    /** Returns the position of the caret, relative to the editor's origin. */
-    Rectangle<int> getCaretRectangle() override;
+    /** Returns the total number of codepoints in the string. */
+    int getTotalNumChars() const override                       { return document.getNumCharacters(); }
 
     /** Moves the caret.
         If selecting is true, the section of the document between the current
@@ -107,10 +110,36 @@ public:
     /** Finds the character at a given on-screen position.
         The coordinates are relative to this component's top-left origin.
     */
-    CodeDocument::Position getPositionAt (int x, int y);
+    CodeDocument::Position getPositionAt (int x, int y) const;
+
+    /** Returns the start of the selection as a position. */
+    CodeDocument::Position getSelectionStart() const            { return selectionStart; }
+
+    /** Returns the end of the selection as a position. */
+    CodeDocument::Position getSelectionEnd() const              { return selectionEnd; }
 
     /** Enables or disables the line-number display in the gutter. */
     void setLineNumbersShown (bool shouldBeShown);
+
+    /** Returns the number of characters from the beginning of the document to the caret. */
+    int getCaretPosition() const override       { return getCaretPos().getPosition(); }
+
+    /** @see getPositionAt */
+    int getCharIndexForPoint (Point<int> point) const override;
+
+    /** Returns the bounds of the caret at a particular location in the text. */
+    Rectangle<int> getCaretRectangleForCharIndex (int index) const override
+    {
+        return getCharacterBounds ({ document, index });
+    }
+
+    /** Returns the bounding box for a range of text in the editor. As the range may span
+        multiple lines, this method returns a RectangleList.
+
+        The bounds are relative to the component's top-left and may extend beyond the bounds
+        of the component if the text is long and word wrapping is disabled.
+    */
+    RectangleList<int> getTextBounds (Range<int> textRange) const override;
 
     //==============================================================================
     bool moveCaretLeft (bool moveInWholeWordSteps, bool selecting);
@@ -128,9 +157,9 @@ public:
     bool deleteBackwards (bool moveInWholeWordSteps);
     bool deleteForwards (bool moveInWholeWordSteps);
     bool deleteWhitespaceBackwardsToTabStop();
-    bool copyToClipboard();
-    bool cutToClipboard();
-    bool pasteFromClipboard();
+    virtual bool copyToClipboard();
+    virtual bool cutToClipboard();
+    virtual bool pasteFromClipboard();
     bool undo();
     bool redo();
 
@@ -161,13 +190,13 @@ public:
     struct State
     {
         /** Creates an object containing the state of the given editor. */
-        State (const CodeEditorComponent& editor);
+        State (const CodeEditorComponent&);
         /** Creates a state object from a string that was previously created with toString(). */
         State (const String& stringifiedVersion);
-        State (const State& other) noexcept;
+        State (const State&) noexcept;
 
         /** Updates the given editor with this saved state. */
-        void restoreState (CodeEditorComponent& editor) const;
+        void restoreState (CodeEditorComponent&) const;
 
         /** Returns a stringified version of this state that can be used to recreate it later. */
         String toString() const;
@@ -204,9 +233,17 @@ public:
     /** Returns the font that the editor is using. */
     const Font& getFont() const noexcept                { return font; }
 
+    /** Makes the editor read-only. */
+    void setReadOnly (bool shouldBeReadOnly) noexcept;
+
+    /** Returns true if the editor is set to be read-only. */
+    bool isReadOnly() const noexcept                    { return readOnly; }
+
     //==============================================================================
+    /** Defines a syntax highlighting colour scheme */
     struct JUCE_API  ColourScheme
     {
+        /** Defines a colour for a token type */
         struct TokenType
         {
             String name;
@@ -215,7 +252,7 @@ public:
 
         Array<TokenType> types;
 
-        void set (const String& name, const Colour colour);
+        void set (const String& name, Colour colour);
     };
 
     /** Changes the syntax highlighting scheme.
@@ -233,6 +270,19 @@ public:
         @see setColourScheme
     */
     Colour getColourForTokenType (int tokenType) const;
+
+    /** Rebuilds the syntax highlighting for a section of text.
+
+        This happens automatically any time the CodeDocument is edited, but this
+        method lets you change text colours even when the CodeDocument hasn't changed.
+
+        For example, you could use this to highlight tokens as the cursor moves.
+        To do so you'll need to tell your custom CodeTokeniser where the token you
+        want to highlight is, and make it return a special type of token. Then you
+        should call this method supplying the range of the highlighted text.
+        @see CodeTokeniser
+     */
+    void retokenise (int startIndex, int endIndex);
 
     //==============================================================================
     /** A set of colour IDs to use to change the colour of various aspects of the editor.
@@ -265,6 +315,12 @@ public:
     virtual void handleTabKey();
     /** Called when the escape key is pressed - this can be overridden for custom behaviour. */
     virtual void handleEscapeKey();
+
+    /** Called when the view position is scrolled horizontally or vertically. */
+    virtual void editorViewportPositionChanged();
+
+    /** Called when the caret position moves. */
+    virtual void caretPositionMoved();
 
     //==============================================================================
     /** This adds the items to the popup menu.
@@ -300,7 +356,7 @@ public:
     */
     virtual void performPopupMenuAction (int menuItemID);
 
-    /** Specifies a commmand-manager which the editor will notify whenever the state
+    /** Specifies a command-manager which the editor will notify whenever the state
         of any of its commands changes.
         If you're making use of the editor's ApplicationCommandTarget interface, then
         you should also use this to tell it which command manager it should use. Make
@@ -333,7 +389,7 @@ public:
     /** @internal */
     bool isTextInputActive() const override;
     /** @internal */
-    void setTemporaryUnderlining (const Array <Range<int> >&) override;
+    void setTemporaryUnderlining (const Array<Range<int>>&) override;
     /** @internal */
     ApplicationCommandTarget* getNextCommandTarget() override;
     /** @internal */
@@ -342,34 +398,35 @@ public:
     void getCommandInfo (CommandID, ApplicationCommandInfo&) override;
     /** @internal */
     bool perform (const InvocationInfo&) override;
+    /** @internal */
+    void lookAndFeelChanged() override;
+    /** @internal */
+    std::unique_ptr<AccessibilityHandler> createAccessibilityHandler() override;
 
 private:
     //==============================================================================
     CodeDocument& document;
 
     Font font;
-    int firstLineOnScreen, spacesPerTab;
-    float charWidth;
-    int lineHeight, linesOnScreen, columnsOnScreen;
-    int scrollbarThickness, columnToTryToMaintain;
-    bool useSpacesForTabs, showLineNumbers;
-    double xOffset;
-
+    int firstLineOnScreen = 0, spacesPerTab = 4;
+    float charWidth = 0;
+    int lineHeight = 0, linesOnScreen = 0, columnsOnScreen = 0;
+    int scrollbarThickness = 16, columnToTryToMaintain = -1;
+    bool readOnly = false, useSpacesForTabs = true, showLineNumbers = false, shouldFollowDocumentChanges = false;
+    double xOffset = 0;
     CodeDocument::Position caretPos, selectionStart, selectionEnd;
 
-    ScopedPointer<CaretComponent> caret;
-    ScrollBar verticalScrollBar, horizontalScrollBar;
-    ApplicationCommandManager* appCommandManager;
+    std::unique_ptr<CaretComponent> caret;
+    ScrollBar verticalScrollBar { true }, horizontalScrollBar { false };
+    ApplicationCommandManager* appCommandManager = nullptr;
 
     class Pimpl;
-    friend class Pimpl;
-    friend struct ContainerDeletePolicy<Pimpl>;
-    ScopedPointer<Pimpl> pimpl;
+    std::unique_ptr<Pimpl> pimpl;
 
     class GutterComponent;
-    friend class GutterComponent;
-    friend struct ContainerDeletePolicy<GutterComponent>;
-    ScopedPointer<GutterComponent> gutter;
+    std::unique_ptr<GutterComponent> gutter;
+
+    class CodeEditorAccessibilityHandler;
 
     enum DragType
     {
@@ -378,19 +435,19 @@ private:
         draggingSelectionEnd
     };
 
-    DragType dragType;
+    DragType dragType = notDragging;
 
     //==============================================================================
     CodeTokeniser* codeTokeniser;
     ColourScheme colourScheme;
 
     class CodeEditorLine;
-    OwnedArray <CodeEditorLine> lines;
+    OwnedArray<CodeEditorLine> lines;
     void rebuildLineTokens();
     void rebuildLineTokensAsync();
     void codeDocumentChanged (int start, int end);
 
-    OwnedArray <CodeDocument::Iterator> cachedIterators;
+    Array<CodeDocument::Iterator> cachedIterators;
     void clearCachedIterators (int firstLineToBeInvalid);
     void updateCachedIterators (int maxLineNum);
     void getIteratorForPosition (int position, CodeDocument::Iterator&);
@@ -400,7 +457,7 @@ private:
 
     //==============================================================================
     void insertText (const String&);
-    void updateCaretPosition();
+    virtual void updateCaretPosition();
     void updateScrollBars();
     void scrollToLineInternal (int line);
     void scrollToColumnInternal (double column);
@@ -409,6 +466,7 @@ private:
     void indentSelectedLines (int spacesToAdd);
     bool skipBackwardsToPreviousTab();
     bool performCommand (CommandID);
+    void setSelection (CodeDocument::Position, CodeDocument::Position);
 
     int indexToColumn (int line, int index) const noexcept;
     int columnToIndex (int line, int column) const noexcept;
@@ -416,5 +474,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CodeEditorComponent)
 };
 
-
-#endif   // JUCE_CODEEDITORCOMPONENT_H_INCLUDED
+} // namespace juce

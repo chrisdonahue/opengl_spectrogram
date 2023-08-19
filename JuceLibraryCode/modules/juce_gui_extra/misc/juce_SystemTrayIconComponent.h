@@ -2,35 +2,38 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_SYSTEMTRAYICONCOMPONENT_H_INCLUDED
-#define JUCE_SYSTEMTRAYICONCOMPONENT_H_INCLUDED
+namespace juce
+{
 
-#if JUCE_WINDOWS || JUCE_LINUX || JUCE_MAC || DOXYGEN
-
+#if JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD || JUCE_MAC || DOXYGEN
 
 //==============================================================================
 /**
-    On Windows and Linux only, this component sits in the taskbar tray as a small icon.
+    This component sits in the taskbar tray as a small icon.
+
+    (NB: The exact behaviour of this class will differ between OSes, and it
+    isn't fully implemented for all OSes)
 
     To use it, just create one of these components, but don't attempt to make it
     visible, add it to a parent, or put it on the desktop.
@@ -44,19 +47,30 @@
     position will not be valid, you can use this to respond to clicks. Traditionally
     you'd use a left-click to show your application's window, and a right-click
     to show a pop-up menu.
+
+    @tags{GUI}
 */
 class JUCE_API  SystemTrayIconComponent  : public Component
 {
 public:
     //==============================================================================
+    /** Constructor. */
     SystemTrayIconComponent();
 
     /** Destructor. */
-    ~SystemTrayIconComponent();
+    ~SystemTrayIconComponent() override;
 
     //==============================================================================
-    /** Changes the image shown in the taskbar. */
-    void setIconImage (const Image& newImage);
+    /** Changes the image shown in the taskbar.
+
+        On Windows and Linux a full colour Image is used as an icon.
+        On macOS a template image is used, where all non-transparent regions will be
+        rendered in a monochrome colour selected dynamically by the operating system.
+
+        @param colourImage     An colour image to use as an icon on Windows and Linux
+        @param templateImage   A template image to use as an icon on macOS
+    */
+    void setIconImage (const Image& colourImage, const Image& templateImage);
 
     /** Changes the icon's tooltip (if the current OS supports this). */
     void setIconTooltip (const String& tooltip);
@@ -76,19 +90,27 @@ public:
     */
     void* getNativeHandle() const;
 
-   #if JUCE_LINUX
+   #if JUCE_LINUX || JUCE_BSD
     /** @internal */
     void paint (Graphics&) override;
+   #endif
+
+   #if JUCE_MAC
+    /** Shows a menu attached to the OSX menu bar icon. */
+    void showDropdownMenu (const PopupMenu& menu);
    #endif
 
 private:
     //==============================================================================
     JUCE_PUBLIC_IN_DLL_BUILD (class Pimpl)
-    ScopedPointer<Pimpl> pimpl;
+    std::unique_ptr<Pimpl> pimpl;
+
+    [[deprecated ("The new setIconImage function signature requires different images for macOS and the other platforms.")]]
+    void setIconImage (const Image& newImage);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SystemTrayIconComponent)
 };
 
-
 #endif
-#endif   // JUCE_SYSTEMTRAYICONCOMPONENT_H_INCLUDED
+
+} // namespace juce

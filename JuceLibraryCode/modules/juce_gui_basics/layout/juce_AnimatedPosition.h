@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_ANIMATEDPOSITION_H_INCLUDED
-#define JUCE_ANIMATEDPOSITION_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -46,20 +46,21 @@
 
     @see AnimatedPositionBehaviours::ContinuousWithMomentum,
          AnimatedPositionBehaviours::SnapToPageBoundaries
+
+    @tags{GUI}
 */
 template <typename Behaviour>
 class AnimatedPosition  : private Timer
 {
 public:
     AnimatedPosition()
-        : position(), grabbedPos(), releaseVelocity(),
-          range (-std::numeric_limits<double>::max(),
-                  std::numeric_limits<double>::max())
+        :  range (-std::numeric_limits<double>::max(),
+                   std::numeric_limits<double>::max())
     {
     }
 
     /** Sets a range within which the value will be constrained. */
-    void setLimits (Range<double> newRange)
+    void setLimits (Range<double> newRange) noexcept
     {
         range = newRange;
     }
@@ -94,7 +95,7 @@ public:
     */
     void endDrag()
     {
-        startTimer (1000 / 60);
+        startTimerHz (60);
     }
 
     /** Called outside of a drag operation to cause a nudge in the specified direction.
@@ -102,7 +103,7 @@ public:
     */
     void nudge (double deltaFromCurrentPosition)
     {
-        startTimer (100);
+        startTimerHz (10);
         moveTo (position + deltaFromCurrentPosition);
     }
 
@@ -131,7 +132,7 @@ public:
     class Listener
     {
     public:
-        virtual ~Listener() {}
+        virtual ~Listener() = default;
 
         /** Called synchronously when an AnimatedPosition changes. */
         virtual void positionChanged (AnimatedPosition&, double newPosition) = 0;
@@ -151,7 +152,7 @@ public:
 
 private:
     //==============================================================================
-    double position, grabbedPos, releaseVelocity;
+    double position = 0.0, grabbedPos = 0.0, releaseVelocity = 0.0;
     Range<double> range;
     Time lastUpdate, lastDrag;
     ListenerList<Listener> listeners;
@@ -159,14 +160,14 @@ private:
     static double getSpeed (const Time last, double lastPos,
                             const Time now, double newPos)
     {
-        const double elapsedSecs = jmax (0.005, (now - last).inSeconds());
-        const double v = (newPos - lastPos) / elapsedSecs;
+        auto elapsedSecs = jmax (0.005, (now - last).inSeconds());
+        auto v = (newPos - lastPos) / elapsedSecs;
         return std::abs (v) > 0.2 ? v : 0.0;
     }
 
     void moveTo (double newPos)
     {
-        const Time now (Time::getCurrentTime());
+        auto now = Time::getCurrentTime();
         releaseVelocity = getSpeed (lastDrag, position, now, newPos);
         behaviour.releasedWithVelocity (newPos, releaseVelocity);
         lastDrag = now;
@@ -178,26 +179,24 @@ private:
     {
         newPosition = range.clipValue (newPosition);
 
-        if (position != newPosition)
+        if (! approximatelyEqual (position, newPosition))
         {
             position = newPosition;
-            listeners.call (&Listener::positionChanged, *this, newPosition);
+            listeners.call ([this, newPosition] (Listener& l) { l.positionChanged (*this, newPosition); });
         }
     }
 
     void timerCallback() override
     {
-        const Time now = Time::getCurrentTime();
-
-        const double elapsed = jlimit (0.001, 0.020, (now - lastUpdate).inSeconds());
+        auto now = Time::getCurrentTime();
+        auto elapsed = jlimit (0.001, 0.020, (now - lastUpdate).inSeconds());
         lastUpdate = now;
-
-        const double newPos = behaviour.getNextPosition (position, elapsed);
+        auto newPos = behaviour.getNextPosition (position, elapsed);
 
         if (behaviour.isStopped (newPos))
             stopTimer();
         else
-            startTimer (1000 / 60);
+            startTimerHz (60);
 
         setPositionAndSendChange (newPos);
     }
@@ -205,5 +204,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnimatedPosition)
 };
 
-
-#endif   // JUCE_ANIMATEDPOSITION_H_INCLUDED
+} // namespace juce

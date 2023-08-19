@@ -2,78 +2,85 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#if JUCE_USE_OPENGL_SHADERS
-
-OpenGLShaderProgram::OpenGLShaderProgram (const OpenGLContext& c) noexcept
-    : context (c)
+namespace juce
 {
-    // This object can only be created and used when the current thread has an active OpenGL context.
-    jassert (OpenGLHelpers::isContextActive());
 
-    programID = context.extensions.glCreateProgram();
+OpenGLShaderProgram::OpenGLShaderProgram (const OpenGLContext& c) noexcept  : context (c)
+{
 }
 
 OpenGLShaderProgram::~OpenGLShaderProgram() noexcept
 {
-    context.extensions.glDeleteProgram (programID);
+    release();
+}
+
+GLuint OpenGLShaderProgram::getProgramID() const noexcept
+{
+    if (programID == 0)
+    {
+        // This method should only be called when the current thread has an active OpenGL context.
+        jassert (OpenGLHelpers::isContextActive());
+
+        programID = context.extensions.glCreateProgram();
+    }
+
+    return programID;
+}
+
+void OpenGLShaderProgram::release() noexcept
+{
+    if (programID != 0)
+    {
+        context.extensions.glDeleteProgram (programID);
+        programID = 0;
+    }
 }
 
 double OpenGLShaderProgram::getLanguageVersion()
 {
-   #if JUCE_OPENGL_ES
-    // GLES doesn't support this version number, but that shouldn't matter since
-    // on GLES you probably won't need to check it.
-    jassertfalse;
-    return 0;
-   #else
-    return String ((const char*) glGetString (GL_SHADING_LANGUAGE_VERSION))
-            .upToFirstOccurrenceOf (" ", false, false).getDoubleValue();
-   #endif
+    return String::fromUTF8 ((const char*) glGetString (GL_SHADING_LANGUAGE_VERSION))
+            .retainCharacters("1234567890.").getDoubleValue();
 }
 
-bool OpenGLShaderProgram::addShader (StringRef code, GLenum type)
+bool OpenGLShaderProgram::addShader (const String& code, GLenum type)
 {
     GLuint shaderID = context.extensions.glCreateShader (type);
 
-   #if JUCE_STRING_UTF_TYPE == 8
-    const GLchar* c = code.text;
-   #else
-    String codeString (code.text);
-    const GLchar* c = codeString.toRawUTF8();
-   #endif
-
+    const GLchar* c = code.toRawUTF8();
     context.extensions.glShaderSource (shaderID, 1, &c, nullptr);
+
     context.extensions.glCompileShader (shaderID);
 
     GLint status = GL_FALSE;
     context.extensions.glGetShaderiv (shaderID, GL_COMPILE_STATUS, &status);
 
-    if (status == GL_FALSE)
+    if (status == (GLint) GL_FALSE)
     {
-        GLchar infoLog [16384];
+        std::vector<GLchar> infoLog (16384);
         GLsizei infoLogLength = 0;
-        context.extensions.glGetShaderInfoLog (shaderID, sizeof (infoLog), &infoLogLength, infoLog);
-        errorLog = String (infoLog, (size_t) infoLogLength);
+        context.extensions.glGetShaderInfoLog (shaderID, (GLsizei) infoLog.size(), &infoLogLength, infoLog.data());
+        errorLog = String (infoLog.data(), (size_t) infoLogLength);
 
        #if JUCE_DEBUG && ! JUCE_DONT_ASSERT_ON_GLSL_COMPILE_ERROR
         // Your GLSL code contained compile errors!
@@ -85,28 +92,33 @@ bool OpenGLShaderProgram::addShader (StringRef code, GLenum type)
         return false;
     }
 
-    context.extensions.glAttachShader (programID, shaderID);
+    context.extensions.glAttachShader (getProgramID(), shaderID);
     context.extensions.glDeleteShader (shaderID);
     JUCE_CHECK_OPENGL_ERROR
     return true;
 }
 
-bool OpenGLShaderProgram::addVertexShader (StringRef code)    { return addShader (code, GL_VERTEX_SHADER); }
-bool OpenGLShaderProgram::addFragmentShader (StringRef code)  { return addShader (code, GL_FRAGMENT_SHADER); }
+bool OpenGLShaderProgram::addVertexShader (const String& code)    { return addShader (code, GL_VERTEX_SHADER); }
+bool OpenGLShaderProgram::addFragmentShader (const String& code)  { return addShader (code, GL_FRAGMENT_SHADER); }
 
 bool OpenGLShaderProgram::link() noexcept
 {
-    context.extensions.glLinkProgram (programID);
+    // This method can only be used when the current thread has an active OpenGL context.
+    jassert (OpenGLHelpers::isContextActive());
+
+    GLuint progID = getProgramID();
+
+    context.extensions.glLinkProgram (progID);
 
     GLint status = GL_FALSE;
-    context.extensions.glGetProgramiv (programID, GL_LINK_STATUS, &status);
+    context.extensions.glGetProgramiv (progID, GL_LINK_STATUS, &status);
 
-    if (status == GL_FALSE)
+    if (status == (GLint) GL_FALSE)
     {
-        GLchar infoLog [16384];
+        std::vector<GLchar> infoLog (16384);
         GLsizei infoLogLength = 0;
-        context.extensions.glGetProgramInfoLog (programID, sizeof (infoLog), &infoLogLength, infoLog);
-        errorLog = String (infoLog, (size_t) infoLogLength);
+        context.extensions.glGetProgramInfoLog (progID, (GLsizei) infoLog.size(), &infoLogLength, infoLog.data());
+        errorLog = String (infoLog.data(), (size_t) infoLogLength);
 
        #if JUCE_DEBUG && ! JUCE_DONT_ASSERT_ON_GLSL_COMPILE_ERROR
         // Your GLSL code contained link errors!
@@ -117,31 +129,59 @@ bool OpenGLShaderProgram::link() noexcept
     }
 
     JUCE_CHECK_OPENGL_ERROR
-    return status != GL_FALSE;
+    return status != (GLint) GL_FALSE;
 }
 
 void OpenGLShaderProgram::use() const noexcept
 {
+    // The shader program must have been successfully linked when this method is called!
+    jassert (programID != 0);
+
     context.extensions.glUseProgram (programID);
 }
 
-OpenGLShaderProgram::Uniform::Uniform (const OpenGLShaderProgram& program, const char* const name)
-    : uniformID (program.context.extensions.glGetUniformLocation (program.programID, name)), context (program.context)
+GLint OpenGLShaderProgram::getUniformIDFromName (const char* uniformName) const noexcept
 {
-    jassert (uniformID >= 0);
+    // The shader program must be active when this method is called!
+    jassert (programID != 0);
+
+    return (GLint) context.extensions.glGetUniformLocation (programID, uniformName);
 }
 
+void OpenGLShaderProgram::setUniform (const char* name, GLfloat n1) noexcept                                       { context.extensions.glUniform1f  (getUniformIDFromName (name), n1); }
+void OpenGLShaderProgram::setUniform (const char* name, GLint n1) noexcept                                         { context.extensions.glUniform1i  (getUniformIDFromName (name), n1); }
+void OpenGLShaderProgram::setUniform (const char* name, GLfloat n1, GLfloat n2) noexcept                           { context.extensions.glUniform2f  (getUniformIDFromName (name), n1, n2); }
+void OpenGLShaderProgram::setUniform (const char* name, GLfloat n1, GLfloat n2, GLfloat n3) noexcept               { context.extensions.glUniform3f  (getUniformIDFromName (name), n1, n2, n3); }
+void OpenGLShaderProgram::setUniform (const char* name, GLfloat n1, GLfloat n2, GLfloat n3, GLfloat n4) noexcept   { context.extensions.glUniform4f  (getUniformIDFromName (name), n1, n2, n3, n4); }
+void OpenGLShaderProgram::setUniform (const char* name, GLint n1, GLint n2, GLint n3, GLint n4) noexcept           { context.extensions.glUniform4i  (getUniformIDFromName (name), n1, n2, n3, n4); }
+void OpenGLShaderProgram::setUniform (const char* name, const GLfloat* values, GLsizei numValues) noexcept         { context.extensions.glUniform1fv (getUniformIDFromName (name), numValues, values); }
+void OpenGLShaderProgram::setUniformMat2 (const char* name, const GLfloat* v, GLint num, GLboolean trns) noexcept  { context.extensions.glUniformMatrix2fv (getUniformIDFromName (name), num, trns, v); }
+void OpenGLShaderProgram::setUniformMat3 (const char* name, const GLfloat* v, GLint num, GLboolean trns) noexcept  { context.extensions.glUniformMatrix3fv (getUniformIDFromName (name), num, trns, v); }
+void OpenGLShaderProgram::setUniformMat4 (const char* name, const GLfloat* v, GLint num, GLboolean trns) noexcept  { context.extensions.glUniformMatrix4fv (getUniformIDFromName (name), num, trns, v); }
+
+//==============================================================================
 OpenGLShaderProgram::Attribute::Attribute (const OpenGLShaderProgram& program, const char* name)
-    : attributeID (program.context.extensions.glGetAttribLocation (program.programID, name))
+    : attributeID ((GLuint) program.context.extensions.glGetAttribLocation (program.getProgramID(), name))
 {
-    jassert (attributeID >= 0);
+   #if JUCE_DEBUG && ! JUCE_DONT_ASSERT_ON_GLSL_COMPILE_ERROR
+    jassert ((GLint) attributeID >= 0);
+   #endif
+}
+
+//==============================================================================
+OpenGLShaderProgram::Uniform::Uniform (const OpenGLShaderProgram& program, const char* const name)
+    : uniformID (program.context.extensions.glGetUniformLocation (program.getProgramID(), name)), context (program.context)
+{
+   #if JUCE_DEBUG && ! JUCE_DONT_ASSERT_ON_GLSL_COMPILE_ERROR
+    jassert (uniformID >= 0);
+   #endif
 }
 
 void OpenGLShaderProgram::Uniform::set (GLfloat n1) const noexcept                                    { context.extensions.glUniform1f (uniformID, n1); }
 void OpenGLShaderProgram::Uniform::set (GLint n1) const noexcept                                      { context.extensions.glUniform1i (uniformID, n1); }
 void OpenGLShaderProgram::Uniform::set (GLfloat n1, GLfloat n2) const noexcept                        { context.extensions.glUniform2f (uniformID, n1, n2); }
 void OpenGLShaderProgram::Uniform::set (GLfloat n1, GLfloat n2, GLfloat n3) const noexcept            { context.extensions.glUniform3f (uniformID, n1, n2, n3); }
-void OpenGLShaderProgram::Uniform::set (GLfloat n1, GLfloat n2, GLfloat n3, float n4) const noexcept  { context.extensions.glUniform4f (uniformID, n1, n2, n3, n4); }
+void OpenGLShaderProgram::Uniform::set (GLfloat n1, GLfloat n2, GLfloat n3, GLfloat n4) const noexcept  { context.extensions.glUniform4f (uniformID, n1, n2, n3, n4); }
 void OpenGLShaderProgram::Uniform::set (GLint n1, GLint n2, GLint n3, GLint n4) const noexcept        { context.extensions.glUniform4i (uniformID, n1, n2, n3, n4); }
 void OpenGLShaderProgram::Uniform::set (const GLfloat* values, GLsizei numValues) const noexcept      { context.extensions.glUniform1fv (uniformID, numValues, values); }
 
@@ -149,4 +189,4 @@ void OpenGLShaderProgram::Uniform::setMatrix2 (const GLfloat* v, GLint num, GLbo
 void OpenGLShaderProgram::Uniform::setMatrix3 (const GLfloat* v, GLint num, GLboolean trns) const noexcept { context.extensions.glUniformMatrix3fv (uniformID, num, trns, v); }
 void OpenGLShaderProgram::Uniform::setMatrix4 (const GLfloat* v, GLint num, GLboolean trns) const noexcept { context.extensions.glUniformMatrix4fv (uniformID, num, trns, v); }
 
-#endif
+} // namespace juce

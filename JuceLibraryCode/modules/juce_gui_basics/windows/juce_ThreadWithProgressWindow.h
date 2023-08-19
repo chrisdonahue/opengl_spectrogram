@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_THREADWITHPROGRESSWINDOW_H_INCLUDED
-#define JUCE_THREADWITHPROGRESSWINDOW_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -77,6 +77,8 @@
     @endcode
 
     @see Thread, AlertWindow
+
+    @tags{GUI}
 */
 class JUCE_API  ThreadWithProgressWindow  : public Thread,
                                             private Timer
@@ -96,7 +98,7 @@ public:
                                         the thread to stop before killing it forcibly (see
                                         Thread::stopThread() )
         @param cancelButtonText         the text that should be shown in the cancel button
-                                        (if it has one)
+                                        (if it has one). Leave this empty for the default "Cancel"
         @param componentToCentreAround  if this is non-null, the window will be positioned
                                         so that it's centred around this component.
     */
@@ -104,13 +106,14 @@ public:
                               bool hasProgressBar,
                               bool hasCancelButton,
                               int timeOutMsWhenCancelling = 10000,
-                              const String& cancelButtonText = "Cancel",
+                              const String& cancelButtonText = String(),
                               Component* componentToCentreAround = nullptr);
 
     /** Destructor. */
-    ~ThreadWithProgressWindow();
+    ~ThreadWithProgressWindow() override;
 
     //==============================================================================
+   #if JUCE_MODAL_LOOPS_PERMITTED
     /** Starts the thread and waits for it to finish.
 
         This will start the thread, make the dialog box appear, and wait until either
@@ -118,11 +121,23 @@ public:
 
         Before returning, the dialog box will be hidden.
 
-        @param threadPriority   the priority to use when starting the thread - see
-                                Thread::startThread() for values
+        @param priority   the priority to use when starting the thread - see
+                          Thread::Priority for values
         @returns true if the thread finished normally; false if the user pressed cancel
     */
-    bool runThread (int threadPriority = 5);
+    bool runThread (Priority priority = Priority::normal);
+   #endif
+
+    /** Starts the thread and returns.
+
+        This will start the thread and make the dialog box appear in a modal state. When
+        the thread finishes normally, or the cancel button is pressed, the window will be
+        hidden and the threadComplete() method will be called.
+
+        @param priority   the priority to use when starting the thread - see
+                          Thread::Priority for values
+    */
+    void launchThread (Priority priority = Priority::normal);
 
     /** The thread should call this periodically to update the position of the progress bar.
 
@@ -135,19 +150,26 @@ public:
     void setStatusMessage (const String& newStatusMessage);
 
     /** Returns the AlertWindow that is being used. */
-    AlertWindow* getAlertWindow() const noexcept        { return alertWindow; }
+    AlertWindow* getAlertWindow() const noexcept        { return alertWindow.get(); }
+
+    //==============================================================================
+    /** This method is called (on the message thread) when the operation has finished.
+        You may choose to use this callback to delete the ThreadWithProgressWindow object.
+    */
+    virtual void threadComplete (bool userPressedCancel);
 
 private:
     //==============================================================================
     void timerCallback() override;
 
     double progress;
-    ScopedPointer <AlertWindow> alertWindow;
+    std::unique_ptr<AlertWindow> alertWindow;
     String message;
     CriticalSection messageLock;
     const int timeOutMsWhenCancelling;
+    bool wasCancelledByUser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ThreadWithProgressWindow)
 };
 
-#endif   // JUCE_THREADWITHPROGRESSWINDOW_H_INCLUDED
+} // namespace juce

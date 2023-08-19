@@ -2,102 +2,119 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_OPENGL_H_INCLUDED
+
+/*******************************************************************************
+ The block below describes the properties of this module, and is read by
+ the Projucer to automatically generate project code that uses it.
+ For details about the syntax and how to create or use a module, see the
+ JUCE Module Format.md file.
+
+
+ BEGIN_JUCE_MODULE_DECLARATION
+
+  ID:                 juce_opengl
+  vendor:             juce
+  version:            7.0.6
+  name:               JUCE OpenGL classes
+  description:        Classes for rendering OpenGL in a JUCE window.
+  website:            http://www.juce.com/juce
+  license:            GPL/Commercial
+  minimumCppStandard: 17
+
+  dependencies:       juce_gui_extra
+  OSXFrameworks:      OpenGL
+  iOSFrameworks:      OpenGLES
+  linuxPackages:      gl
+  mingwLibs:          opengl32
+
+ END_JUCE_MODULE_DECLARATION
+
+*******************************************************************************/
+
+
+#pragma once
 #define JUCE_OPENGL_H_INCLUDED
 
-#include "../juce_gui_extra/juce_gui_extra.h"
+#include <juce_core/system/juce_TargetPlatform.h>
 
 #undef JUCE_OPENGL
 #define JUCE_OPENGL 1
 
 #if JUCE_IOS || JUCE_ANDROID
  #define JUCE_OPENGL_ES 1
- #define JUCE_USE_OPENGL_FIXED_FUNCTION 0
+ #include "opengl/juce_gles2.h"
+#else
+ #include "opengl/juce_gl.h"
 #endif
 
-#if JUCE_WINDOWS
- #ifndef APIENTRY
-  #define APIENTRY __stdcall
-  #define CLEAR_TEMP_APIENTRY 1
- #endif
- #ifndef WINGDIAPI
-  #define WINGDIAPI __declspec(dllimport)
-  #define CLEAR_TEMP_WINGDIAPI 1
- #endif
- #include <gl/GL.h>
- #ifdef CLEAR_TEMP_WINGDIAPI
-  #undef WINGDIAPI
-  #undef CLEAR_TEMP_WINGDIAPI
- #endif
- #ifdef CLEAR_TEMP_APIENTRY
-  #undef APIENTRY
-  #undef CLEAR_TEMP_APIENTRY
- #endif
-#elif JUCE_LINUX
- #include <GL/gl.h>
- #undef KeyPress
-#elif JUCE_IOS
- #include <OpenGLES/ES2/gl.h>
-#elif JUCE_MAC
- #include <OpenGL/gl.h>
- #include "OpenGL/glext.h"
-#elif JUCE_ANDROID
- #include <GLES2/gl2.h>
+#include <juce_gui_extra/juce_gui_extra.h>
+
+//==============================================================================
+#if JUCE_OPENGL_ES || DOXYGEN
+ /** This macro is a helper for use in GLSL shader code which needs to compile on both GLES and desktop GL.
+     Since it's mandatory in GLES to mark a variable with a precision, but the keywords don't exist in normal GLSL,
+     these macros define the various precision keywords only on GLES.
+ */
+ #define JUCE_MEDIUMP  "mediump"
+
+ /** This macro is a helper for use in GLSL shader code which needs to compile on both GLES and desktop GL.
+     Since it's mandatory in GLES to mark a variable with a precision, but the keywords don't exist in normal GLSL,
+     these macros define the various precision keywords only on GLES.
+ */
+ #define JUCE_HIGHP    "highp"
+
+ /** This macro is a helper for use in GLSL shader code which needs to compile on both GLES and desktop GL.
+     Since it's mandatory in GLES to mark a variable with a precision, but the keywords don't exist in normal GLSL,
+     these macros define the various precision keywords only on GLES.
+ */
+ #define JUCE_LOWP     "lowp"
+#else
+ #define JUCE_MEDIUMP
+ #define JUCE_HIGHP
+ #define JUCE_LOWP
 #endif
 
-#if ! defined (JUCE_USE_OPENGL_SHADERS)
- #define JUCE_USE_OPENGL_SHADERS 1
-#endif
-
-#ifndef JUCE_USE_OPENGL_FIXED_FUNCTION
- #define JUCE_USE_OPENGL_FIXED_FUNCTION 1
-#endif
-
-//=============================================================================
+//==============================================================================
 namespace juce
 {
+    class OpenGLTexture;
+    class OpenGLFrameBuffer;
+    class OpenGLShaderProgram;
+}
 
-class OpenGLTexture;
-class OpenGLFrameBuffer;
-
-#include "native/juce_MissingGLDefinitions.h"
+#include "geometry/juce_Vector3D.h"
+#include "geometry/juce_Matrix3D.h"
+#include "geometry/juce_Quaternion.h"
+#include "geometry/juce_Draggable3DOrientation.h"
 #include "opengl/juce_OpenGLHelpers.h"
-#include "opengl/juce_Quaternion.h"
-#include "opengl/juce_Matrix3D.h"
-#include "opengl/juce_Draggable3DOrientation.h"
 #include "opengl/juce_OpenGLPixelFormat.h"
 #include "native/juce_OpenGLExtensions.h"
 #include "opengl/juce_OpenGLRenderer.h"
 #include "opengl/juce_OpenGLContext.h"
 #include "opengl/juce_OpenGLFrameBuffer.h"
 #include "opengl/juce_OpenGLGraphicsContext.h"
-#include "opengl/juce_OpenGLHelpers.h"
 #include "opengl/juce_OpenGLImage.h"
-#include "opengl/juce_OpenGLRenderer.h"
 #include "opengl/juce_OpenGLShaderProgram.h"
 #include "opengl/juce_OpenGLTexture.h"
-#include "opengl/juce_Vector3D.h"
-
-}
-
-#endif   // JUCE_OPENGL_H_INCLUDED
+#include "utils/juce_OpenGLAppComponent.h"

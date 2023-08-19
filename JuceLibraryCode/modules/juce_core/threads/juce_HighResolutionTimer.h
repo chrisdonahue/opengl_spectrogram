@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_HIGHRESOLUTIONTIMER_H_INCLUDED
-#define JUCE_HIGHRESOLUTIONTIMER_H_INCLUDED
+namespace juce
+{
 
 /**
     A high-resolution periodic timer.
@@ -38,10 +32,12 @@
 
     You should only use this class in situations where you really need accuracy,
     because unlike the normal Timer class, which is very lightweight and cheap
-    to start/stop, the HighResolutionTimer will use far more resources, and
-    starting/stopping it may involve launching and killing threads.
+    the HighResolutionTimer will use far more resources and require thread
+    safety considerations.
 
     @see Timer
+
+    @tags{Core}
 */
 class JUCE_API  HighResolutionTimer
 {
@@ -61,20 +57,29 @@ public:
         This will be called on a dedicated timer thread, so make sure your
         implementation is thread-safe!
 
+        On some platforms the dedicated timer thread may be shared with
+        other HighResolutionTimer's so aim to complete any work in this
+        callback as fast as possible.
+
         It's perfectly ok to call startTimer() or stopTimer() from within this
-        callback to change the subsequent intervals.
+        callback to change the subsequent intervals. However, if you call
+        stopTimer() in the callback it's still best practice to call stopTimer()
+        from the destructor in order to avoid data races.
     */
     virtual void hiResTimerCallback() = 0;
 
     //==============================================================================
     /** Starts the timer and sets the length of interval required.
 
-        If the timer is already started, this will reset its counter, so the
-        time between calling this method and the next timer callback will not be
-        less than the interval length passed in.
+        If the timer has already started, this will reset the timer, so the
+        time between calling this method and the next timer callback
+        will not be less than the interval length passed in.
 
-        @param  intervalInMilliseconds  the interval to use (any values less than 1 will be
-                                        rounded up to 1)
+        In exceptional circumstances the dedicated timer thread may not start,
+        if this is a potential concern for your use case, you can call isTimerRunning()
+        to confirm if the timer actually started.
+
+        @param  intervalInMilliseconds  the interval to use (a value of zero or less will stop the timer)
     */
     void startTimer (int intervalInMilliseconds);
 
@@ -83,6 +88,9 @@ public:
         This method may block while it waits for pending callbacks to complete. Once it
         returns, no more callbacks will be made. If it is called from the timer's own thread,
         it will cancel the timer after the current callback returns.
+
+        To prevent data races it's normally best practice to call this in the derived classes
+        destructor, even if stopTimer() was called in the hiResTimerCallback().
     */
     void stopTimer();
 
@@ -97,13 +105,10 @@ public:
     int getTimerInterval() const noexcept;
 
 private:
-    struct Pimpl;
-    friend struct Pimpl;
-    friend struct ContainerDeletePolicy<Pimpl>;
-    ScopedPointer<Pimpl> pimpl;
+    class Impl;
+    std::unique_ptr<Impl> impl;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HighResolutionTimer)
 };
 
-
-#endif   // JUCE_HIGHRESOLUTIONTIMER_H_INCLUDED
+} // namespace juce

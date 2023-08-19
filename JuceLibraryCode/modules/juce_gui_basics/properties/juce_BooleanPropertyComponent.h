@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_BOOLEANPROPERTYCOMPONENT_H_INCLUDED
-#define JUCE_BOOLEANPROPERTYCOMPONENT_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -34,9 +34,10 @@
     toggle on/off.
 
     @see PropertyComponent
+
+    @tags{GUI}
 */
-class JUCE_API  BooleanPropertyComponent  : public PropertyComponent,
-                                            private ButtonListener // (can't use Button::Listener due to idiotic VC2005 bug)
+class JUCE_API  BooleanPropertyComponent  : public PropertyComponent
 {
 protected:
     //==============================================================================
@@ -56,6 +57,10 @@ protected:
 public:
     /** Creates a button component.
 
+        Note that if you call this constructor then you must use the Value to interact with the
+        button state, and you can't override the class with your own setState or getState methods.
+        If you want to use getState and setState, call the other constructor instead.
+
         @param valueToControl       a Value object that this property should refer to.
         @param propertyName         the property name to be passed to the PropertyComponent
         @param buttonText           the text shown in the ToggleButton component
@@ -65,7 +70,7 @@ public:
                               const String& buttonText);
 
     /** Destructor. */
-    ~BooleanPropertyComponent();
+    ~BooleanPropertyComponent() override;
 
     //==============================================================================
     /** Called to change the state of the boolean value. */
@@ -75,12 +80,24 @@ public:
     virtual bool getState() const;
 
     //==============================================================================
+    /** A set of colour IDs to use to change the colour of various aspects of the component.
+
+        These constants can be used either via the Component::setColour(), or LookAndFeel::setColour()
+        methods.
+
+        @see Component::setColour, Component::findColour, LookAndFeel::setColour, LookAndFeel::findColour
+    */
+    enum ColourIds
+    {
+        backgroundColourId          = 0x100e801,    /**< The colour to fill the background of the button area. */
+        outlineColourId             = 0x100e803,    /**< The colour to use to draw an outline around the text area. */
+    };
+
+    //==============================================================================
     /** @internal */
     void paint (Graphics&) override;
     /** @internal */
     void refresh() override;
-    /** @internal */
-    void buttonClicked (Button*) override;
 
 private:
     ToggleButton button;
@@ -89,5 +106,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BooleanPropertyComponent)
 };
 
-
-#endif   // JUCE_BOOLEANPROPERTYCOMPONENT_H_INCLUDED
+} // namespace juce

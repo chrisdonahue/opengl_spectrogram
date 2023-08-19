@@ -2,32 +2,34 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_CPLUSPLUSCODETOKENISERFUNCTIONS_H_INCLUDED
-#define JUCE_CPLUSPLUSCODETOKENISERFUNCTIONS_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /** Class containing some basic functions for simple tokenising of C++ code.
+
+    @tags{GUI}
 */
 struct CppTokeniserFunctions
 {
@@ -46,33 +48,38 @@ struct CppTokeniserFunctions
     static bool isReservedKeyword (String::CharPointerType token, const int tokenLength) noexcept
     {
         static const char* const keywords2Char[] =
-            { "if", "do", "or", "id", 0 };
+            { "do", "if", "or", nullptr };
 
         static const char* const keywords3Char[] =
-            { "for", "int", "new", "try", "xor", "and", "asm", "not", 0 };
+            { "and", "asm", "for", "int", "new", "not", "try", "xor", nullptr };
 
         static const char* const keywords4Char[] =
-            { "bool", "void", "this", "true", "long", "else", "char",
-              "enum", "case", "goto", "auto", 0 };
+            { "auto", "bool", "case", "char", "else", "enum", "goto",
+              "long", "this", "true", "void", nullptr };
 
         static const char* const keywords5Char[] =
-            {  "while", "bitor", "break", "catch", "class", "compl", "const", "false",
-                "float", "short", "throw", "union", "using", "or_eq", 0 };
+            { "bitor", "break", "catch", "class", "compl", "const", "false", "final",
+              "float", "or_eq", "short", "throw", "union", "using", "while", nullptr };
 
         static const char* const keywords6Char[] =
-            { "return", "struct", "and_eq", "bitand", "delete", "double", "extern",
-              "friend", "inline", "not_eq", "public", "sizeof", "static", "signed",
-              "switch", "typeid", "wchar_t", "xor_eq", 0};
+            { "and_eq", "bitand", "delete", "double", "export", "extern", "friend",
+              "import", "inline", "module", "not_eq", "public", "return", "signed",
+              "sizeof", "static", "struct", "switch", "typeid", "xor_eq", nullptr };
 
         static const char* const keywords7Char[] =
-            { "default", "mutable", "private", "typedef", "nullptr", "virtual", 0 };
+            { "__cdecl", "_Pragma", "alignas", "alignof", "concept", "default",
+              "mutable", "nullptr", "private", "typedef", "uint8_t", "virtual",
+              "wchar_t", nullptr };
 
         static const char* const keywordsOther[] =
-            { "noexcept", "const_cast", "continue", "explicit", "namespace",
-              "operator", "protected", "register", "reinterpret_cast", "static_cast",
-              "template", "typename", "unsigned", "volatile", "constexpr",
-              "@implementation", "@interface", "@end", "@synthesize", "@dynamic", "@public",
-              "@private", "@property", "@protected", "@class", 0 };
+            { "@class", "@dynamic", "@end", "@implementation", "@interface", "@public",
+              "@private", "@protected", "@property", "@synthesize", "__fastcall", "__stdcall",
+              "atomic_cancel", "atomic_commit", "atomic_noexcept", "char16_t", "char32_t",
+              "co_await", "co_return", "co_yield", "const_cast", "constexpr", "continue",
+              "decltype", "dynamic_cast", "explicit", "namespace", "noexcept", "operator", "override",
+              "protected", "register", "reinterpret_cast", "requires", "static_assert",
+              "static_cast", "synchronized", "template", "thread_local", "typename", "unsigned",
+              "volatile", nullptr };
 
         const char* const* k;
 
@@ -93,23 +100,23 @@ struct CppTokeniserFunctions
                 break;
         }
 
-        for (int i = 0; k[i] != 0; ++i)
+        for (int i = 0; k[i] != nullptr; ++i)
             if (token.compare (CharPointer_ASCII (k[i])) == 0)
                 return true;
 
         return false;
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static int parseIdentifier (Iterator& source) noexcept
     {
         int tokenLength = 0;
-        String::CharPointerType::CharType possibleIdentifier [100];
+        String::CharPointerType::CharType possibleIdentifier[100] = {};
         String::CharPointerType possible (possibleIdentifier);
 
         while (isIdentifierBody (source.peekNextChar()))
         {
-            const juce_wchar c = source.nextChar();
+            auto c = source.nextChar();
 
             if (tokenLength < 20)
                 possible.write (c);
@@ -128,10 +135,11 @@ struct CppTokeniserFunctions
         return CPlusPlusCodeTokeniser::tokenType_identifier;
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static bool skipNumberSuffix (Iterator& source)
     {
-        const juce_wchar c = source.peekNextChar();
+        auto c = source.peekNextChar();
+
         if (c == 'l' || c == 'L' || c == 'u' || c == 'U')
             source.skip();
 
@@ -148,7 +156,7 @@ struct CppTokeniserFunctions
                 || (c >= 'A' && c <= 'F');
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static bool parseHexLiteral (Iterator& source) noexcept
     {
         if (source.peekNextChar() == '-')
@@ -157,11 +165,13 @@ struct CppTokeniserFunctions
         if (source.nextChar() != '0')
             return false;
 
-        juce_wchar c = source.nextChar();
+        auto c = source.nextChar();
+
         if (c != 'x' && c != 'X')
             return false;
 
         int numDigits = 0;
+
         while (isHexDigit (source.peekNextChar()))
         {
             ++numDigits;
@@ -179,7 +189,7 @@ struct CppTokeniserFunctions
         return c >= '0' && c <= '7';
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static bool parseOctalLiteral (Iterator& source) noexcept
     {
         if (source.peekNextChar() == '-')
@@ -202,7 +212,7 @@ struct CppTokeniserFunctions
         return c >= '0' && c <= '9';
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static bool parseDecimalLiteral (Iterator& source) noexcept
     {
         if (source.peekNextChar() == '-')
@@ -221,7 +231,7 @@ struct CppTokeniserFunctions
         return skipNumberSuffix (source);
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static bool parseFloatLiteral (Iterator& source) noexcept
     {
         if (source.peekNextChar() == '-')
@@ -251,18 +261,19 @@ struct CppTokeniserFunctions
         if (numDigits == 0)
             return false;
 
-        juce_wchar c = source.peekNextChar();
-        const bool hasExponent = (c == 'e' || c == 'E');
+        auto c = source.peekNextChar();
+        bool hasExponent = (c == 'e' || c == 'E');
 
         if (hasExponent)
         {
             source.skip();
-
             c = source.peekNextChar();
+
             if (c == '+' || c == '-')
                 source.skip();
 
             int numExpDigits = 0;
+
             while (isDecimalDigit (source.peekNextChar()))
             {
                 source.skip();
@@ -274,6 +285,7 @@ struct CppTokeniserFunctions
         }
 
         c = source.peekNextChar();
+
         if (c == 'f' || c == 'F')
             source.skip();
         else if (! (hasExponent || hasPoint))
@@ -282,7 +294,7 @@ struct CppTokeniserFunctions
         return true;
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static int parseNumber (Iterator& source)
     {
         const Iterator original (source);
@@ -302,14 +314,14 @@ struct CppTokeniserFunctions
         return CPlusPlusCodeTokeniser::tokenType_error;
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static void skipQuotedString (Iterator& source) noexcept
     {
-        const juce_wchar quote = source.nextChar();
+        auto quote = source.nextChar();
 
         for (;;)
         {
-            const juce_wchar c = source.nextChar();
+            auto c = source.nextChar();
 
             if (c == quote || c == 0)
                 break;
@@ -319,14 +331,14 @@ struct CppTokeniserFunctions
         }
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static void skipComment (Iterator& source) noexcept
     {
         bool lastWasStar = false;
 
         for (;;)
         {
-            const juce_wchar c = source.nextChar();
+            auto c = source.nextChar();
 
             if (c == 0 || (c == '/' && lastWasStar))
                 break;
@@ -335,14 +347,14 @@ struct CppTokeniserFunctions
         }
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static void skipPreprocessorLine (Iterator& source) noexcept
     {
         bool lastWasBackslash = false;
 
         for (;;)
         {
-            const juce_wchar c = source.peekNextChar();
+            auto c = source.peekNextChar();
 
             if (c == '"')
             {
@@ -354,7 +366,7 @@ struct CppTokeniserFunctions
             {
                 Iterator next (source);
                 next.skip();
-                const juce_wchar c2 = next.peekNextChar();
+                auto c2 = next.peekNextChar();
 
                 if (c2 == '/' || c2 == '*')
                     return;
@@ -378,162 +390,141 @@ struct CppTokeniserFunctions
         }
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static void skipIfNextCharMatches (Iterator& source, const juce_wchar c) noexcept
     {
         if (source.peekNextChar() == c)
             source.skip();
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static void skipIfNextCharMatches (Iterator& source, const juce_wchar c1, const juce_wchar c2) noexcept
     {
-        const juce_wchar c = source.peekNextChar();
+        auto c = source.peekNextChar();
 
         if (c == c1 || c == c2)
             source.skip();
     }
 
-    template<class Iterator>
+    template <typename Iterator>
     static int readNextToken (Iterator& source)
     {
-        int result = CPlusPlusCodeTokeniser::tokenType_error;
         source.skipWhitespace();
-
-        const juce_wchar firstChar = source.peekNextChar();
+        auto firstChar = source.peekNextChar();
 
         switch (firstChar)
         {
         case 0:
-            source.skip();
             break;
 
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
+        case '0':   case '1':   case '2':   case '3':   case '4':
+        case '5':   case '6':   case '7':   case '8':   case '9':
         case '.':
-            result = parseNumber (source);
+        {
+            auto result = parseNumber (source);
 
             if (result == CPlusPlusCodeTokeniser::tokenType_error)
             {
                 source.skip();
 
                 if (firstChar == '.')
-                    result = CPlusPlusCodeTokeniser::tokenType_punctuation;
+                    return CPlusPlusCodeTokeniser::tokenType_punctuation;
             }
 
-            break;
+            return result;
+        }
 
         case ',':
         case ';':
         case ':':
             source.skip();
-            result = CPlusPlusCodeTokeniser::tokenType_punctuation;
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_punctuation;
 
-        case '(':
-        case ')':
-        case '{':
-        case '}':
-        case '[':
-        case ']':
+        case '(':   case ')':
+        case '{':   case '}':
+        case '[':   case ']':
             source.skip();
-            result = CPlusPlusCodeTokeniser::tokenType_bracket;
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_bracket;
 
         case '"':
         case '\'':
             skipQuotedString (source);
-            result = CPlusPlusCodeTokeniser::tokenType_string;
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_string;
 
         case '+':
-            result = CPlusPlusCodeTokeniser::tokenType_operator;
             source.skip();
             skipIfNextCharMatches (source, '+', '=');
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_operator;
 
         case '-':
+        {
             source.skip();
-            result = parseNumber (source);
+            auto result = parseNumber (source);
 
             if (result == CPlusPlusCodeTokeniser::tokenType_error)
             {
-                result = CPlusPlusCodeTokeniser::tokenType_operator;
                 skipIfNextCharMatches (source, '-', '=');
+                return CPlusPlusCodeTokeniser::tokenType_operator;
             }
-            break;
 
-        case '*':
-        case '%':
-        case '=':
-        case '!':
-            result = CPlusPlusCodeTokeniser::tokenType_operator;
+            return result;
+        }
+
+        case '*':   case '%':
+        case '=':   case '!':
             source.skip();
             skipIfNextCharMatches (source, '=');
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_operator;
 
         case '/':
-            result = CPlusPlusCodeTokeniser::tokenType_operator;
+        {
             source.skip();
+            auto nextChar = source.peekNextChar();
 
-            if (source.peekNextChar() == '=')
+            if (nextChar == '/')
             {
-                source.skip();
-            }
-            else if (source.peekNextChar() == '/')
-            {
-                result = CPlusPlusCodeTokeniser::tokenType_comment;
                 source.skipToEndOfLine();
-            }
-            else if (source.peekNextChar() == '*')
-            {
-                source.skip();
-                result = CPlusPlusCodeTokeniser::tokenType_comment;
-                skipComment (source);
+                return CPlusPlusCodeTokeniser::tokenType_comment;
             }
 
-            break;
+            if (nextChar == '*')
+            {
+                source.skip();
+                skipComment (source);
+                return CPlusPlusCodeTokeniser::tokenType_comment;
+            }
+
+            if (nextChar == '=')
+                source.skip();
+
+            return CPlusPlusCodeTokeniser::tokenType_operator;
+        }
 
         case '?':
         case '~':
             source.skip();
-            result = CPlusPlusCodeTokeniser::tokenType_operator;
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_operator;
 
-        case '<':
-        case '>':
-        case '|':
-        case '&':
-        case '^':
+        case '<':   case '>':
+        case '|':   case '&':   case '^':
             source.skip();
-            result = CPlusPlusCodeTokeniser::tokenType_operator;
             skipIfNextCharMatches (source, firstChar);
             skipIfNextCharMatches (source, '=');
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_operator;
 
         case '#':
-            result = CPlusPlusCodeTokeniser::tokenType_preprocessor;
             skipPreprocessorLine (source);
-            break;
+            return CPlusPlusCodeTokeniser::tokenType_preprocessor;
 
         default:
             if (isIdentifierStart (firstChar))
-                result = parseIdentifier (source);
-            else
-                source.skip();
+                return parseIdentifier (source);
 
+            source.skip();
             break;
         }
 
-        return result;
+        return CPlusPlusCodeTokeniser::tokenType_error;
     }
 
     /** A class that can be passed to the CppTokeniserFunctions functions in order to
@@ -541,8 +532,8 @@ struct CppTokeniserFunctions
     */
     struct StringIterator
     {
-        StringIterator (const String& s) noexcept            : t (s.getCharPointer()), numChars (0) {}
-        StringIterator (String::CharPointerType s) noexcept  : t (s), numChars (0) {}
+        StringIterator (const String& s) noexcept            : t (s.getCharPointer()) {}
+        StringIterator (String::CharPointerType s) noexcept  : t (s) {}
 
         juce_wchar nextChar() noexcept      { if (isEOF()) return 0; ++numChars; return t.getAndAdvance(); }
         juce_wchar peekNextChar()noexcept   { return *t; }
@@ -552,9 +543,132 @@ struct CppTokeniserFunctions
         bool isEOF() const noexcept         { return t.isEmpty(); }
 
         String::CharPointerType t;
-        int numChars;
+        int numChars = 0;
     };
+
+    //==============================================================================
+    /** Takes a UTF8 string and writes it to a stream using standard C++ escape sequences for any
+        non-ascii bytes.
+
+        Although not strictly a tokenising function, this is still a function that often comes in
+        handy when working with C++ code!
+
+        Note that addEscapeChars() is easier to use than this function if you're working with Strings.
+
+        @see addEscapeChars
+    */
+    static void writeEscapeChars (OutputStream& out, const char* utf8, const int numBytesToRead,
+                                  const int maxCharsOnLine, const bool breakAtNewLines,
+                                  const bool replaceSingleQuotes, const bool allowStringBreaks)
+    {
+        int charsOnLine = 0;
+        bool lastWasHexEscapeCode = false;
+        bool trigraphDetected = false;
+
+        for (int i = 0; i < numBytesToRead || numBytesToRead < 0; ++i)
+        {
+            auto c = (unsigned char) utf8[i];
+            bool startNewLine = false;
+
+            switch (c)
+            {
+
+                case '\t':  out << "\\t";  trigraphDetected = false; lastWasHexEscapeCode = false; charsOnLine += 2; break;
+                case '\r':  out << "\\r";  trigraphDetected = false; lastWasHexEscapeCode = false; charsOnLine += 2; break;
+                case '\n':  out << "\\n";  trigraphDetected = false; lastWasHexEscapeCode = false; charsOnLine += 2; startNewLine = breakAtNewLines; break;
+                case '\\':  out << "\\\\"; trigraphDetected = false; lastWasHexEscapeCode = false; charsOnLine += 2; break;
+                case '\"':  out << "\\\""; trigraphDetected = false; lastWasHexEscapeCode = false; charsOnLine += 2; break;
+
+                case '?':
+                    if (trigraphDetected)
+                    {
+                        out << "\\?";
+                        charsOnLine++;
+                        trigraphDetected = false;
+                    }
+                    else
+                    {
+                        out << "?";
+                        trigraphDetected = true;
+                    }
+
+                    lastWasHexEscapeCode = false;
+                    charsOnLine++;
+                    break;
+
+                case 0:
+                    if (numBytesToRead < 0)
+                        return;
+
+                    out << "\\0";
+                    lastWasHexEscapeCode = true;
+                    trigraphDetected = false;
+                    charsOnLine += 2;
+                    break;
+
+                case '\'':
+                    if (replaceSingleQuotes)
+                    {
+                        out << "\\\'";
+                        lastWasHexEscapeCode = false;
+                        trigraphDetected = false;
+                        charsOnLine += 2;
+                        break;
+                    }
+                    // deliberate fall-through...
+                    JUCE_FALLTHROUGH
+
+                default:
+                    if (c >= 32 && c < 127 && ! (lastWasHexEscapeCode  // (have to avoid following a hex escape sequence with a valid hex digit)
+                                                   && CharacterFunctions::getHexDigitValue (c) >= 0))
+                    {
+                        out << (char) c;
+                        lastWasHexEscapeCode = false;
+                        trigraphDetected = false;
+                        ++charsOnLine;
+                    }
+                    else if (allowStringBreaks && lastWasHexEscapeCode && c >= 32 && c < 127)
+                    {
+                        out << "\"\"" << (char) c;
+                        lastWasHexEscapeCode = false;
+                        trigraphDetected = false;
+                        charsOnLine += 3;
+                    }
+                    else
+                    {
+                        out << (c < 16 ? "\\x0" : "\\x") << String::toHexString ((int) c);
+                        lastWasHexEscapeCode = true;
+                        trigraphDetected = false;
+                        charsOnLine += 4;
+                    }
+
+                    break;
+            }
+
+            if ((startNewLine || (maxCharsOnLine > 0 && charsOnLine >= maxCharsOnLine))
+                 && (numBytesToRead < 0 || i < numBytesToRead - 1))
+            {
+                charsOnLine = 0;
+                out << "\"" << newLine << "\"";
+                lastWasHexEscapeCode = false;
+            }
+        }
+    }
+
+    /** Takes a string and returns a version of it where standard C++ escape sequences have been
+        used to replace any non-ascii bytes.
+
+        Although not strictly a tokenising function, this is still a function that often comes in
+        handy when working with C++ code!
+
+        @see writeEscapeChars
+    */
+    static String addEscapeChars (const String& s)
+    {
+        MemoryOutputStream mo;
+        writeEscapeChars (mo, s.toRawUTF8(), -1, -1, false, true, true);
+        return mo.toString();
+    }
 };
 
-
-#endif   // JUCE_CPLUSPLUSCODETOKENISERFUNCTIONS_H_INCLUDED
+} // namespace juce

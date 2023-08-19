@@ -2,93 +2,68 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-PluginDescription::PluginDescription()
-    : uid (0),
-      isInstrument (false),
-      numInputChannels (0),
-      numOutputChannels (0),
-      hasSharedContainer (false)
+namespace juce
 {
+
+bool PluginDescription::isDuplicateOf (const PluginDescription& other) const noexcept
+{
+    const auto tie = [] (const PluginDescription& d)
+    {
+        return std::tie (d.fileOrIdentifier, d.deprecatedUid, d.uniqueId);
+    };
+
+    return tie (*this) == tie (other);
 }
 
-PluginDescription::~PluginDescription()
+static String getPluginDescSuffix (const PluginDescription& d, int uid)
 {
+    return "-" + String::toHexString (d.fileOrIdentifier.hashCode())
+         + "-" + String::toHexString (uid);
 }
 
-PluginDescription::PluginDescription (const PluginDescription& other)
-    : name (other.name),
-      descriptiveName (other.descriptiveName),
-      pluginFormatName (other.pluginFormatName),
-      category (other.category),
-      manufacturerName (other.manufacturerName),
-      version (other.version),
-      fileOrIdentifier (other.fileOrIdentifier),
-      lastFileModTime (other.lastFileModTime),
-      uid (other.uid),
-      isInstrument (other.isInstrument),
-      numInputChannels (other.numInputChannels),
-      numOutputChannels (other.numOutputChannels),
-      hasSharedContainer (other.hasSharedContainer)
+bool PluginDescription::matchesIdentifierString (const String& identifierString) const
 {
-}
+    const auto matches = [&] (int uid)
+    {
+        return identifierString.endsWithIgnoreCase (getPluginDescSuffix (*this, uid));
+    };
 
-PluginDescription& PluginDescription::operator= (const PluginDescription& other)
-{
-    name = other.name;
-    descriptiveName = other.descriptiveName;
-    pluginFormatName = other.pluginFormatName;
-    category = other.category;
-    manufacturerName = other.manufacturerName;
-    version = other.version;
-    fileOrIdentifier = other.fileOrIdentifier;
-    uid = other.uid;
-    isInstrument = other.isInstrument;
-    lastFileModTime = other.lastFileModTime;
-    numInputChannels = other.numInputChannels;
-    numOutputChannels = other.numOutputChannels;
-    hasSharedContainer = other.hasSharedContainer;
-
-    return *this;
-}
-
-bool PluginDescription::isDuplicateOf (const PluginDescription& other) const
-{
-    return fileOrIdentifier == other.fileOrIdentifier
-            && uid == other.uid;
+    return matches (uniqueId) || matches (deprecatedUid);
 }
 
 String PluginDescription::createIdentifierString() const
 {
-    return pluginFormatName
-            + "-" + name
-            + "-" + String::toHexString (fileOrIdentifier.hashCode())
-            + "-" + String::toHexString (uid);
+    const auto idToUse = uniqueId != 0 ? uniqueId : deprecatedUid;
+    return pluginFormatName + "-" + name + getPluginDescSuffix (*this, idToUse);
 }
 
-XmlElement* PluginDescription::createXml() const
+std::unique_ptr<XmlElement> PluginDescription::createXml() const
 {
-    XmlElement* const e = new XmlElement ("PLUGIN");
+    auto e = std::make_unique<XmlElement> ("PLUGIN");
+
     e->setAttribute ("name", name);
+
     if (descriptiveName != name)
         e->setAttribute ("descriptiveName", descriptiveName);
 
@@ -97,12 +72,16 @@ XmlElement* PluginDescription::createXml() const
     e->setAttribute ("manufacturer", manufacturerName);
     e->setAttribute ("version", version);
     e->setAttribute ("file", fileOrIdentifier);
-    e->setAttribute ("uid", String::toHexString (uid));
+    e->setAttribute ("uniqueId", String::toHexString (uniqueId));
     e->setAttribute ("isInstrument", isInstrument);
     e->setAttribute ("fileTime", String::toHexString (lastFileModTime.toMilliseconds()));
+    e->setAttribute ("infoUpdateTime", String::toHexString (lastInfoUpdateTime.toMilliseconds()));
     e->setAttribute ("numInputs", numInputChannels);
     e->setAttribute ("numOutputs", numOutputChannels);
     e->setAttribute ("isShell", hasSharedContainer);
+    e->setAttribute ("hasARAExtension", hasARAExtension);
+
+    e->setAttribute ("uid", String::toHexString (deprecatedUid));
 
     return e;
 }
@@ -118,15 +97,21 @@ bool PluginDescription::loadFromXml (const XmlElement& xml)
         manufacturerName    = xml.getStringAttribute ("manufacturer");
         version             = xml.getStringAttribute ("version");
         fileOrIdentifier    = xml.getStringAttribute ("file");
-        uid                 = xml.getStringAttribute ("uid").getHexValue32();
         isInstrument        = xml.getBoolAttribute ("isInstrument", false);
         lastFileModTime     = Time (xml.getStringAttribute ("fileTime").getHexValue64());
+        lastInfoUpdateTime  = Time (xml.getStringAttribute ("infoUpdateTime").getHexValue64());
         numInputChannels    = xml.getIntAttribute ("numInputs");
         numOutputChannels   = xml.getIntAttribute ("numOutputs");
         hasSharedContainer  = xml.getBoolAttribute ("isShell", false);
+        hasARAExtension     = xml.getBoolAttribute ("hasARAExtension", false);
+
+        deprecatedUid       = xml.getStringAttribute ("uid").getHexValue32();
+        uniqueId            = xml.getStringAttribute ("uniqueId", "0").getHexValue32();
 
         return true;
     }
 
     return false;
 }
+
+} // namespace juce

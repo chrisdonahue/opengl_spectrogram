@@ -25,6 +25,8 @@
 
 #include "JuceHeader.h"
 
+using namespace juce;
+
 #include "open_gl_component.h"
 #include "audio_util.h"
 
@@ -42,9 +44,9 @@ class open_gl_component;
                                                                     //[/Comments]
 */
 class spectrogram_component  : public Component,
-                               public ComboBoxListener,
-                               public SliderListener,
-                               public ButtonListener
+public ComboBox::Listener,
+public Slider::Listener,
+public Button::Listener
 {
 public:
     //==============================================================================

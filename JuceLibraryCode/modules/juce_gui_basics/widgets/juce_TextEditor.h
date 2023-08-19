@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_TEXTEDITOR_H_INCLUDED
-#define JUCE_TEXTEDITOR_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -34,9 +34,11 @@
     fonts and colours.
 
     @see TextEditor::Listener, Label
+
+    @tags{GUI}
 */
-class JUCE_API  TextEditor  : public Component,
-                              public TextInputTarget,
+class JUCE_API  TextEditor  : public TextInputTarget,
+                              public Component,
                               public SettableTooltipClient
 {
 public:
@@ -51,11 +53,11 @@ public:
                                     for a black splodge (not all fonts include this, though), or 0x2022,
                                     which is a bullet (probably the best choice for linux).
     */
-    explicit TextEditor (const String& componentName = String::empty,
+    explicit TextEditor (const String& componentName = String(),
                          juce_wchar passwordCharacter = 0);
 
     /** Destructor. */
-    ~TextEditor();
+    ~TextEditor() override;
 
     //==============================================================================
     /** Puts the editor into either multi- or single-line mode.
@@ -66,7 +68,12 @@ public:
         See also the setReturnKeyStartsNewLine() method, which will also need to be turned
         on if you want a multi-line editor with line-breaks.
 
-        @see isMultiLine, setReturnKeyStartsNewLine
+        @param shouldBeMultiLine whether the editor should be multi- or single-line.
+        @param shouldWordWrap    sets whether long lines should be broken up in multi-line editors.
+                                 If this is false and scrollbars are enabled a horizontal scrollbar
+                                 will be shown.
+
+        @see isMultiLine, setReturnKeyStartsNewLine, setScrollbarsShown
     */
     void setMultiLine (bool shouldBeMultiLine,
                        bool shouldWordWrap = true);
@@ -123,7 +130,7 @@ public:
     void setReadOnly (bool shouldBeReadOnly);
 
     /** Returns true if the editor is in read-only mode. */
-    bool isReadOnly() const;
+    bool isReadOnly() const noexcept;
 
     //==============================================================================
     /** Makes the caret visible or invisible.
@@ -135,16 +142,16 @@ public:
     /** Returns true if the caret is enabled.
         @see setCaretVisible
     */
-    bool isCaretVisible() const noexcept                            { return caret != nullptr; }
+    bool isCaretVisible() const noexcept                            { return caretVisible && ! isReadOnly(); }
 
     //==============================================================================
-    /** Enables/disables a vertical scrollbar.
+    /** Enables or disables scrollbars (this only applies when in multi-line mode).
 
-        (This only applies when in multi-line mode). When the text gets too long to fit
-        in the component, a scrollbar can appear to allow it to be scrolled. Even when
-        this is enabled, the scrollbar will be hidden unless it's needed.
+        When the text gets too long to fit in the component, a scrollbar can appear to
+        allow it to be scrolled. Even when this is enabled, the scrollbar will be hidden
+        unless it's needed.
 
-        By default the scrollbar is enabled.
+        By default scrollbars are enabled.
     */
     void setScrollbarsShown (bool shouldBeEnabled);
 
@@ -152,7 +159,6 @@ public:
         @see setScrollbarsShown
     */
     bool areScrollbarsShown() const noexcept                        { return scrollbarVisible; }
-
 
     /** Changes the password character used to disguise the text.
 
@@ -169,7 +175,6 @@ public:
         @see setPasswordCharacter
     */
     juce_wchar getPasswordCharacter() const noexcept                { return passwordCharacter; }
-
 
     //==============================================================================
     /** Allows a right-click menu to appear for the editor.
@@ -195,6 +200,8 @@ public:
         These constants can be used either via the Component::setColour(), or LookAndFeel::setColour()
         methods.
 
+        NB: You can also set the caret colour using CaretComponent::caretColourId
+
         @see Component::setColour, Component::findColour, LookAndFeel::setColour, LookAndFeel::findColour
     */
     enum ColourIds
@@ -204,8 +211,8 @@ public:
 
         textColourId             = 0x1000201, /**< The colour that will be used when text is added to the editor. Note
                                                    that because the editor can contain multiple colours, calling this
-                                                   method won't change the colour of existing text - to do that, call
-                                                   applyFontToAllText() after calling this method.*/
+                                                   method won't change the colour of existing text - to do that, use
+                                                   the applyColourToAllText() method */
 
         highlightColourId        = 0x1000202, /**< The colour with which to fill the background of highlighted sections of
                                                    the text - this can be transparent if you don't want to show any
@@ -235,15 +242,38 @@ public:
     void setFont (const Font& newFont);
 
     /** Applies a font to all the text in the editor.
-        This will also set the current font to use for any new text that's added.
+
+        If the changeCurrentFont argument is true then this will also set the
+        new font as the font to be used for any new text that's added.
+
         @see setFont
     */
-    void applyFontToAllText (const Font& newFont);
+    void applyFontToAllText (const Font& newFont, bool changeCurrentFont = true);
 
     /** Returns the font that's currently being used for new text.
+
         @see setFont
     */
-    const Font& getFont() const noexcept            { return currentFont; }
+    const Font& getFont() const noexcept  { return currentFont; }
+
+    /** Applies a colour to all the text in the editor.
+
+        If the changeCurrentTextColour argument is true then this will also set the
+        new colour as the colour to be used for any new text that's added.
+    */
+    void applyColourToAllText (const Colour& newColour, bool changeCurrentTextColour = true);
+
+    /** Sets whether whitespace should be underlined when the editor font is underlined.
+
+        @see isWhitespaceUnderlined
+    */
+    void setWhitespaceUnderlined (bool shouldUnderlineWhitespace) noexcept  { underlineWhitespace = shouldUnderlineWhitespace; }
+
+    /** Returns true if whitespace is underlined for underlined fonts.
+
+        @see setWhitespaceIsUnderlined
+    */
+    bool isWhitespaceUnderlined() const noexcept                            { return underlineWhitespace; }
 
     //==============================================================================
     /** If set to true, focusing on the editor will highlight all its text.
@@ -263,6 +293,12 @@ public:
     */
     void setTextToShowWhenEmpty (const String& text, Colour colourToUse);
 
+    /** Returns the text that will be shown when the text editor is empty.
+
+        @see setTextToShowWhenEmpty
+    */
+    String getTextToShowWhenEmpty() const noexcept    { return textToShowWhenEmpty; }
+
     //==============================================================================
     /** Changes the size of the scrollbars that are used.
         Handy if you need smaller scrollbars for a small text box.
@@ -279,7 +315,7 @@ public:
     {
     public:
         /** Destructor. */
-        virtual ~Listener()  {}
+        virtual ~Listener() = default;
 
         /** Called when the user changes the text in some way. */
         virtual void textEditorTextChanged (TextEditor&) {}
@@ -305,6 +341,19 @@ public:
     void removeListener (Listener* listenerToRemove);
 
     //==============================================================================
+    /** You can assign a lambda to this callback object to have it called when the text is changed. */
+    std::function<void()> onTextChange;
+
+    /** You can assign a lambda to this callback object to have it called when the return key is pressed. */
+    std::function<void()> onReturnKey;
+
+    /** You can assign a lambda to this callback object to have it called when the escape key is pressed. */
+    std::function<void()> onEscapeKey;
+
+    /** You can assign a lambda to this callback object to have it called when the editor loses key focus. */
+    std::function<void()> onFocusLost;
+
+    //==============================================================================
     /** Returns the entire contents of the editor. */
     String getText() const;
 
@@ -326,7 +375,7 @@ public:
         @param newText                  the text to add
         @param sendTextChangeMessage    if true, this will cause a change message to
                                         be sent to all the listeners.
-        @see insertText
+        @see insertTextAtCaret
     */
     void setText (const String& newText,
                   bool sendTextChangeMessage = true);
@@ -345,7 +394,7 @@ public:
         this string, otherwise it will be inserted.
 
         To delete a section of text, you can use setHighlightedRegion() to
-        highlight it, and call insertTextAtCursor (String::empty).
+        highlight it, and call insertTextAtCaret (String()).
 
         @see setCaretPosition, getCaretPosition, setHighlightedRegion
     */
@@ -374,7 +423,7 @@ public:
     /** Returns the current index of the caret.
         @see setCaretPosition
     */
-    int getCaretPosition() const;
+    int getCaretPosition() const override;
 
     /** Moves the caret to be in front of a given character.
         @see getCaretPosition, moveCaretToEnd
@@ -394,12 +443,11 @@ public:
     */
     void scrollEditorToPositionCaret (int desiredCaretX, int desiredCaretY);
 
-    /** Get the graphical position of the caret.
+    /** Get the graphical position of the caret for a particular index in the text.
 
         The rectangle returned is relative to the component's top-left corner.
-        @see scrollEditorToPositionCaret
     */
-    Rectangle<int> getCaretRectangle() override;
+    Rectangle<int> getCaretRectangleForCharIndex (int index) const override;
 
     /** Selects a section of the text. */
     void setHighlightedRegion (const Range<int>& newSelection) override;
@@ -416,14 +464,24 @@ public:
     /** Finds the index of the character at a given position.
         The coordinates are relative to the component's top-left.
     */
-    int getTextIndexAt (int x, int y);
+    int getTextIndexAt (int x, int y) const;
+
+    /** Finds the index of the character at a given position.
+        The coordinates are relative to the component's top-left.
+    */
+    int getTextIndexAt (Point<int>) const;
+
+    /** Like getTextIndexAt, but doesn't snap to the beginning/end of the range for
+        points vertically outside the text.
+    */
+    int getCharIndexForPoint (Point<int> point) const override;
 
     /** Counts the number of characters in the text.
 
         This is quicker than getting the text as a string if you just need to know
         the length.
     */
-    int getTotalNumChars() const;
+    int getTotalNumChars() const override;
 
     /** Returns the total width of the text, as it is currently laid-out.
 
@@ -444,10 +502,20 @@ public:
     */
     void setIndents (int newLeftIndent, int newTopIndent);
 
+    /** Returns the gap at the top edge of the editor.
+        @see setIndents
+    */
+    int getTopIndent() const noexcept   { return topIndent; }
+
+    /** Returns the gap at the left edge of the editor.
+        @see setIndents
+    */
+    int getLeftIndent() const noexcept  { return leftIndent; }
+
     /** Changes the size of border left around the edge of the component.
         @see getBorder
     */
-    void setBorder (const BorderSize<int>& border);
+    void setBorder (BorderSize<int> border);
 
     /** Returns the size of border around the edge of the component.
         @see setBorder
@@ -460,6 +528,29 @@ public:
         set to false, it won't.
     */
     void setScrollToShowCursor (bool shouldScrollToShowCaret);
+
+    /** Modifies the justification of the text within the editor window. */
+    void setJustification (Justification newJustification);
+
+    /** Returns the type of justification, as set in setJustification(). */
+    Justification getJustificationType() const noexcept             { return justification; }
+
+    /** Sets the line spacing of the TextEditor.
+        The default (and minimum) value is 1.0 and values > 1.0 will increase the line spacing as a
+        multiple of the line height e.g. for double-spacing call this method with an argument of 2.0.
+    */
+    void setLineSpacing (float newLineSpacing) noexcept             { lineSpacing = jmax (1.0f, newLineSpacing); }
+
+    /** Returns the current line spacing of the TextEditor. */
+    float getLineSpacing() const noexcept                           { return lineSpacing; }
+
+    /** Returns the bounding box for a range of text in the editor. As the range may span
+        multiple lines, this method returns a RectangleList.
+
+        The bounds are relative to the component's top-left and may extend beyond the bounds
+        of the component if the text is long and word wrapping is disabled.
+    */
+    RectangleList<int> getTextBounds (Range<int> textRange) const override;
 
     //==============================================================================
     void moveCaretToEnd();
@@ -528,8 +619,8 @@ public:
     class JUCE_API  InputFilter
     {
     public:
-        InputFilter() {}
-        virtual ~InputFilter() {}
+        InputFilter() = default;
+        virtual ~InputFilter() = default;
 
         /** This method is called whenever text is entered into the editor.
             An implementation of this class should should check the input string,
@@ -552,11 +643,11 @@ public:
         */
         LengthAndCharacterRestriction (int maxNumChars, const String& allowedCharacters);
 
+        String filterNewText (TextEditor&, const String&) override;
+
     private:
         String allowedCharacters;
         int maxLength;
-
-        String filterNewText (TextEditor&, const String&) override;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LengthAndCharacterRestriction)
     };
@@ -568,6 +659,9 @@ public:
     */
     void setInputFilter (InputFilter* newFilter, bool takeOwnership);
 
+    /** Returns the current InputFilter, as set by setInputFilter(). */
+    InputFilter* getInputFilter() const noexcept                { return inputFilter; }
+
     /** Sets limits on the characters that can be entered.
         This is just a shortcut that passes an instance of the LengthAndCharacterRestriction
         class to setInputFilter().
@@ -578,7 +672,25 @@ public:
                                     this string are allowed to be entered into the editor.
     */
     void setInputRestrictions (int maxTextLength,
-                               const String& allowedCharacters = String::empty);
+                               const String& allowedCharacters = String());
+
+    /** Sets the type of virtual keyboard that should be displayed when this editor has
+        focus.
+    */
+    void setKeyboardType (VirtualKeyboardType type) noexcept    { keyboardType = type; }
+
+    /** Sets the behaviour of mouse/touch interactions outside this component.
+
+        If true, then presses outside of the TextEditor will dismiss the virtual keyboard.
+        If false, then the virtual keyboard will remain onscreen for as long as the TextEditor has
+        keyboard focus.
+    */
+    void setClicksOutsideDismissVirtualKeyboard (bool);
+
+    /** Returns true if the editor is configured to hide the virtual keyboard when the mouse is
+        pressed on another component.
+    */
+    bool getClicksOutsideDismissVirtualKeyboard() const     { return clicksOutsideDismissVirtualKeyboard; }
 
     //==============================================================================
     /** This abstract base class is implemented by LookAndFeel classes to provide
@@ -586,7 +698,7 @@ public:
     */
     struct JUCE_API  LookAndFeelMethods
     {
-        virtual ~LookAndFeelMethods() {}
+        virtual ~LookAndFeelMethods() = default;
 
         virtual void fillTextEditorBackground (Graphics&, int width, int height, TextEditor&) = 0;
         virtual void drawTextEditorOutline (Graphics&, int width, int height, TextEditor&) = 0;
@@ -622,13 +734,17 @@ public:
     /** @internal */
     void enablementChanged() override;
     /** @internal */
-    void colourChanged() override;
-    /** @internal */
     void lookAndFeelChanged() override;
+    /** @internal */
+    void parentHierarchyChanged() override;
     /** @internal */
     bool isTextInputActive() const override;
     /** @internal */
-    void setTemporaryUnderlining (const Array <Range<int> >&) override;
+    void setTemporaryUnderlining (const Array<Range<int>>&) override;
+    /** @internal */
+    VirtualKeyboardType getKeyboardType() override;
+    /** @internal */
+    std::unique_ptr<AccessibilityHandler> createAccessibilityHandler() override;
 
 protected:
     //==============================================================================
@@ -649,90 +765,115 @@ protected:
 
 private:
     //==============================================================================
-    class Iterator;
     JUCE_PUBLIC_IN_DLL_BUILD (class UniformTextSection)
-    class TextHolderComponent;
-    class InsertAction;
-    class RemoveAction;
-    friend class InsertAction;
-    friend class RemoveAction;
+    struct Iterator;
+    struct TextHolderComponent;
+    struct TextEditorViewport;
+    struct InsertAction;
+    struct RemoveAction;
+    class EditorAccessibilityHandler;
 
-    ScopedPointer <Viewport> viewport;
+    class GlobalMouseListener : private MouseListener
+    {
+    public:
+        explicit GlobalMouseListener (Component& e) : editor (e) { Desktop::getInstance().addGlobalMouseListener    (this); }
+        ~GlobalMouseListener() override                          { Desktop::getInstance().removeGlobalMouseListener (this); }
+
+        bool lastMouseDownInEditor() const { return mouseDownInEditor; }
+
+    private:
+        void mouseDown (const MouseEvent& event) override { mouseDownInEditor = event.originalComponent == &editor; }
+
+        Component& editor;
+        bool mouseDownInEditor = false;
+    };
+
+    std::unique_ptr<Viewport> viewport;
     TextHolderComponent* textHolder;
-    BorderSize<int> borderSize;
+    BorderSize<int> borderSize { 1, 1, 1, 3 };
+    Justification justification { Justification::topLeft };
+    const GlobalMouseListener globalMouseListener { *this };
 
-    bool readOnly                   : 1;
-    bool multiline                  : 1;
-    bool wordWrap                   : 1;
-    bool returnKeyStartsNewLine     : 1;
-    bool popupMenuEnabled           : 1;
-    bool selectAllTextWhenFocused   : 1;
-    bool scrollbarVisible           : 1;
-    bool wasFocused                 : 1;
-    bool keepCaretOnScreen          : 1;
-    bool tabKeyUsed                 : 1;
-    bool menuActive                 : 1;
-    bool valueTextNeedsUpdating     : 1;
-    bool consumeEscAndReturnKeys    : 1;
+    bool readOnly = false;
+    bool caretVisible = true;
+    bool multiline = false;
+    bool wordWrap = false;
+    bool returnKeyStartsNewLine = false;
+    bool popupMenuEnabled = true;
+    bool selectAllTextWhenFocused = false;
+    bool scrollbarVisible = true;
+    bool wasFocused = false;
+    bool keepCaretOnScreen = true;
+    bool tabKeyUsed = false;
+    bool menuActive = false;
+    bool valueTextNeedsUpdating = false;
+    bool consumeEscAndReturnKeys = true;
+    bool underlineWhitespace = true;
+    bool clicksOutsideDismissVirtualKeyboard = false;
 
     UndoManager undoManager;
-    ScopedPointer<CaretComponent> caret;
+    std::unique_ptr<CaretComponent> caret;
     Range<int> selection;
-    int leftIndent, topIndent;
-    unsigned int lastTransactionTime;
-    Font currentFont;
-    mutable int totalNumChars;
-    int caretPosition;
-    Array <UniformTextSection*> sections;
+    int leftIndent = 4, topIndent = 4;
+    unsigned int lastTransactionTime = 0;
+    Font currentFont { 14.0f };
+    mutable int totalNumChars = 0;
+    int caretPosition = 0;
+    OwnedArray<UniformTextSection> sections;
     String textToShowWhenEmpty;
     Colour colourForTextWhenEmpty;
     juce_wchar passwordCharacter;
     OptionalScopedPointer<InputFilter> inputFilter;
     Value textValue;
+    VirtualKeyboardType keyboardType = TextInputTarget::textKeyboard;
+    float lineSpacing = 1.0f;
 
-    enum
+    enum DragType
     {
         notDragging,
         draggingSelectionStart,
         draggingSelectionEnd
-    } dragType;
+    };
 
-    ListenerList <Listener> listeners;
-    Array <Range<int> > underlinedSections;
+    DragType dragType = notDragging;
+
+    ListenerList<Listener> listeners;
+    Array<Range<int>> underlinedSections;
 
     void moveCaret (int newCaretPos);
     void moveCaretTo (int newPosition, bool isSelecting);
+    void recreateCaret();
     void handleCommandMessage (int) override;
     void coalesceSimilarSections();
     void splitSection (int sectionIndex, int charToSplitAt);
     void clearInternal (UndoManager*);
-    void insert (const String&, int insertIndex, const Font&, const Colour, UndoManager*, int newCaretPos);
-    void reinsert (int insertIndex, const Array <UniformTextSection*>&);
-    void remove (Range<int> range, UndoManager*, int caretPositionToMoveTo);
-    void getCharPosition (int index, float& x, float& y, float& lineHeight) const;
+    void insert (const String&, int insertIndex, const Font&, Colour, UndoManager*, int newCaretPos);
+    void reinsert (int insertIndex, const OwnedArray<UniformTextSection>&);
+    void remove (Range<int>, UndoManager*, int caretPositionToMoveTo);
+    void getCharPosition (int index, Point<float>&, float& lineHeight) const;
     void updateCaretPosition();
     void updateValueFromText();
     void textWasChangedByValue();
-    int indexAtPosition (float x, float y);
+    int indexAtPosition (float x, float y) const;
     int findWordBreakAfter (int position) const;
     int findWordBreakBefore (int position) const;
     bool moveCaretWithTransaction (int newPos, bool selecting);
-    friend class TextHolderComponent;
-    friend class TextEditorViewport;
     void drawContent (Graphics&);
-    void updateTextHolderSize();
-    float getWordWrapWidth() const;
+    void checkLayout();
+    int getWordWrapWidth() const;
+    int getMaximumTextWidth() const;
+    int getMaximumTextHeight() const;
     void timerCallbackInt();
+    void checkFocus();
     void repaintText (Range<int>);
     void scrollByLines (int deltaLines);
     bool undoOrRedo (bool shouldUndo);
     UndoManager* getUndoManager() noexcept;
+    void setSelection (Range<int>) noexcept;
+    Point<int> getTextOffset() const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TextEditor)
 };
 
-/** This typedef is just for compatibility with old code - newer code should use the TextEditor::Listener class directly. */
-typedef TextEditor::Listener TextEditorListener;
 
-
-#endif   // JUCE_TEXTEDITOR_H_INCLUDED
+} // namespace juce

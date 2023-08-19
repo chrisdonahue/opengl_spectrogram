@@ -1,34 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_CRITICALSECTION_H_INCLUDED
-#define JUCE_CRITICALSECTION_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,7 +31,13 @@
     one of these is by using RAII in the form of a local ScopedLock object - have a look
     through the codebase for many examples of how to do this.
 
+    In almost all cases you'll want to declare your CriticalSection as a member variable.
+    Occasionally you may want to declare one as a static variable, but in that case the usual
+    C++ static object order-of-construction warnings should be heeded.
+
     @see ScopedLock, ScopedTryLock, ScopedUnlock, SpinLock, ReadWriteLock, Thread, InterProcessLock
+
+    @tags{Core}
 */
 class JUCE_API  CriticalSection
 {
@@ -91,13 +90,13 @@ public:
 
     //==============================================================================
     /** Provides the type of scoped lock to use with a CriticalSection. */
-    typedef GenericScopedLock <CriticalSection>       ScopedLockType;
+    using ScopedLockType = GenericScopedLock<CriticalSection>;
 
     /** Provides the type of scoped unlocker to use with a CriticalSection. */
-    typedef GenericScopedUnlock <CriticalSection>     ScopedUnlockType;
+    using ScopedUnlockType = GenericScopedUnlock<CriticalSection>;
 
     /** Provides the type of scoped try-locker to use with a CriticalSection. */
-    typedef GenericScopedTryLock <CriticalSection>    ScopedTryLockType;
+    using ScopedTryLockType = GenericScopedTryLock<CriticalSection>;
 
 
 private:
@@ -107,9 +106,9 @@ private:
     // a block of memory here that's big enough to be used internally as a windows
     // CRITICAL_SECTION structure.
     #if JUCE_64BIT
-     uint8 lock[44];
+     std::aligned_storage_t<44, 8> lock;
     #else
-     uint8 lock[24];
+     std::aligned_storage_t<24, 8> lock;
     #endif
    #else
     mutable pthread_mutex_t lock;
@@ -128,12 +127,14 @@ private:
     manage to optimise it out of existence.
 
     @see CriticalSection, Array, OwnedArray, ReferenceCountedArray
+
+    @tags{Core}
 */
 class JUCE_API  DummyCriticalSection
 {
 public:
-    inline DummyCriticalSection() noexcept      {}
-    inline ~DummyCriticalSection() noexcept     {}
+    inline DummyCriticalSection() = default;
+    inline ~DummyCriticalSection() = default;
 
     inline void enter() const noexcept          {}
     inline bool tryEnter() const noexcept       { return true; }
@@ -147,7 +148,7 @@ public:
     };
 
     /** A dummy scoped-unlocker type to use with a dummy critical section. */
-    typedef ScopedLockType ScopedUnlockType;
+    using ScopedUnlockType = ScopedLockType;
 
 private:
     JUCE_DECLARE_NON_COPYABLE (DummyCriticalSection)
@@ -157,26 +158,32 @@ private:
 /**
     Automatically locks and unlocks a CriticalSection object.
 
-    Use one of these as a local variable to provide RAII-based locking of a CriticalSection.
+    You can use a ScopedLock as a local variable to provide RAII-based locking of a CriticalSection.
 
     e.g. @code
 
-    CriticalSection myCriticalSection;
-
-    for (;;)
+    struct MyObject
     {
-        const ScopedLock myScopedLock (myCriticalSection);
-        // myCriticalSection is now locked
+        CriticalSection objectLock;
 
-        ...do some stuff...
+        // assuming that this example function will be called by multiple threads
+        void foo()
+        {
+            const ScopedLock myScopedLock (objectLock);
 
-        // myCriticalSection gets unlocked here.
-    }
+            // objectLock is now locked..
+
+            ...do some thread-safe work here...
+
+            // ..and objectLock gets unlocked here, as myScopedLock goes out of
+            // scope at the end of the block
+        }
+    };
     @endcode
 
     @see CriticalSection, ScopedUnlock
 */
-typedef CriticalSection::ScopedLockType  ScopedLock;
+using ScopedLock = CriticalSection::ScopedLockType;
 
 //==============================================================================
 /**
@@ -189,34 +196,34 @@ typedef CriticalSection::ScopedLockType  ScopedLock;
 
     e.g. @code
 
-    CriticalSection myCriticalSection;
-
-    for (;;)
+    struct MyObject
     {
-        const ScopedLock myScopedLock (myCriticalSection);
-        // myCriticalSection is now locked
+        CriticalSection objectLock;
 
-        ... do some stuff with it locked ..
-
-        while (xyz)
+        void foo()
         {
-            ... do some stuff with it locked ..
+            {
+                const ScopedLock myScopedLock (objectLock);
 
-            const ScopedUnlock unlocker (myCriticalSection);
+                // objectLock is now locked..
 
-            // myCriticalSection is now unlocked for the remainder of this block,
-            // and re-locked at the end.
+                {
+                    ScopedUnlock myUnlocker (objectLock);
 
-            ...do some stuff with it unlocked ...
+                    // ..and now unlocked..
+                }
+
+                // ..and now locked again..
+            }
+
+            // ..and finally unlocked.
         }
-
-        // myCriticalSection gets unlocked here.
-    }
+    };
     @endcode
 
     @see CriticalSection, ScopedLock
 */
-typedef CriticalSection::ScopedUnlockType  ScopedUnlock;
+using ScopedUnlock = CriticalSection::ScopedUnlockType;
 
 //==============================================================================
 /**
@@ -225,31 +232,31 @@ typedef CriticalSection::ScopedUnlockType  ScopedUnlock;
     Use one of these as a local variable to control access to a CriticalSection.
 
     e.g. @code
-    CriticalSection myCriticalSection;
 
-    for (;;)
+    struct MyObject
     {
-        const ScopedTryLock myScopedTryLock (myCriticalSection);
+        CriticalSection objectLock;
 
-        // Unlike using a ScopedLock, this may fail to actually get the lock, so you
-        // should test this with the isLocked() method before doing your thread-unsafe
-        // action..
-        if (myScopedTryLock.isLocked())
+        void foo()
         {
-           ...do some stuff...
-        }
-        else
-        {
-            ..our attempt at locking failed because another thread had already locked it..
-        }
+            const ScopedTryLock myScopedTryLock (objectLock);
 
-        // myCriticalSection gets unlocked here (if it was locked)
-    }
+            // Unlike using a ScopedLock, this may fail to actually get the lock, so you
+            // must call the isLocked() method before making any assumptions..
+            if (myScopedTryLock.isLocked())
+            {
+               ...safely do some work...
+            }
+            else
+            {
+                // If we get here, then our attempt at locking failed because another thread had already locked it..
+            }
+        }
+    };
     @endcode
 
     @see CriticalSection::tryEnter, ScopedLock, ScopedUnlock, ScopedReadLock
 */
-typedef CriticalSection::ScopedTryLockType  ScopedTryLock;
+using ScopedTryLock = CriticalSection::ScopedTryLockType;
 
-
-#endif   // JUCE_CRITICALSECTION_H_INCLUDED
+} // namespace juce

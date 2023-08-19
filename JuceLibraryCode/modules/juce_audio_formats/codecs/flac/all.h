@@ -1,5 +1,6 @@
 /* libFLAC - Free Lossless Audio Codec library
- * Copyright (C) 2000,2001,2002,2003,2004,2005,2006,2007  Josh Coalson
+ * Copyright (C) 2000-2009  Josh Coalson
+ * Copyright (C) 2011-2016  Xiph.Org Foundation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +33,10 @@
 #ifndef FLAC__ALL_H
 #define FLAC__ALL_H
 
+#ifndef FLAC__HAS_OGG
+ #define FLAC__HAS_OGG 0
+#endif
+
 #include "export.h"
 
 #include "assert.h"
@@ -41,38 +46,6 @@
 #include "ordinals.h"
 #include "stream_decoder.h"
 #include "stream_encoder.h"
-
-
-#ifdef _MSC_VER
-/* OPT: an MSVC built-in would be better */
-static _inline FLAC__uint32 local_swap32_(FLAC__uint32 x)
-{
-	x = ((x<<8)&0xFF00FF00) | ((x>>8)&0x00FF00FF);
-	return (x>>16) | (x<<16);
-}
-#endif
-
-#if defined(_MSC_VER) && defined(_X86_)
-/* OPT: an MSVC built-in would be better */
-static void local_swap32_block_(FLAC__uint32 *start, FLAC__uint32 len)
-{
-	__asm {
-		mov edx, start
-		mov ecx, len
-		test ecx, ecx
-loop1:
-		jz done1
-		mov eax, [edx]
-		bswap eax
-		mov [edx], eax
-		add edx, 4
-		dec ecx
-		jmp short loop1
-done1:
-	}
-}
-#endif
-
 
 /** \mainpage
  *
@@ -178,7 +151,7 @@ done1:
  * library.
  *
  * Also, there are several places in the libFLAC code with comments marked
- * with "OPT:" where a #define can be changed to enable code that might be
+ * with "OPT:" where a \#define can be changed to enable code that might be
  * faster on a specific platform.  Experimenting with these can yield faster
  * binaries.
  */
@@ -190,10 +163,10 @@ done1:
  * the libraries to newer versions of FLAC.
  *
  * One simple facility for making porting easier that has been added
- * in FLAC 1.1.3 is a set of \c #defines in \c export.h of each
+ * in FLAC 1.1.3 is a set of \#defines in \c export.h of each
  * library's includes (e.g. \c include/FLAC/export.h).  The
- * \c #defines mirror the libraries'
- * <A HREF="http://www.gnu.org/software/libtool/manual.html#Libtool-versioning">libtool version numbers</A>,
+ * \#defines mirror the libraries'
+ * <A HREF="http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning">libtool version numbers</A>,
  * e.g. in libFLAC there are \c FLAC_API_VERSION_CURRENT,
  * \c FLAC_API_VERSION_REVISION, and \c FLAC_API_VERSION_AGE.
  * These can be used to support multiple versions of an API during the
@@ -207,7 +180,7 @@ done1:
  * #endif
  * \endcode
  *
- * The the source will work for multiple versions and the legacy code can
+ * The source will work for multiple versions and the legacy code can
  * easily be removed when the transition is complete.
  *
  * Another available symbol is FLAC_API_SUPPORTS_OGG_FLAC (defined in
@@ -352,7 +325,7 @@ done1:
  *
  * The \a bytes parameter to FLAC__StreamDecoderReadCallback,
  * FLAC__StreamEncoderReadCallback, and FLAC__StreamEncoderWriteCallback
- * is now \c size_t instead of \c unsigned.
+ * is now \c size_t instead of \c uint32_t.
  */
 
 /** \defgroup porting_1_1_3_to_1_1_4 Porting from FLAC 1.1.3 to 1.1.4

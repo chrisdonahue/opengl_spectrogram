@@ -2,45 +2,49 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#if JUCE_MSVC
- #pragma warning (push)
- #pragma warning (disable: 4390 4611 4365 4267)
- #ifdef __INTEL_COMPILER
-  #pragma warning (disable: 2544 2545)
- #endif
-#endif
+namespace juce
+{
+
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4390 4611 4365 4267 4616 2544 2545 6297)
 
 namespace zlibNamespace
 {
 #if JUCE_INCLUDE_ZLIB_CODE
   #undef OS_CODE
   #undef fdopen
-  #include "../../juce_core/zip/zlib/zlib.h"
+  #define ZLIB_INTERNAL
+  #define NO_DUMMY_DECL
+  #include <juce_core/zip/zlib/zlib.h>
   #undef OS_CODE
 #else
   #include JUCE_ZLIB_INCLUDE_PATH
 #endif
 }
+
+#if ! defined (jmp_buf) || ! defined (longjmp)
+ #include <setjmp.h>
+#endif
 
 namespace pnglibNamespace
 {
@@ -54,11 +58,16 @@ namespace pnglibNamespace
    using std::free;
   #endif
 
-  #if JUCE_CLANG
-   #pragma clang diagnostic push
-   #pragma clang diagnostic ignored "-Wsign-conversion"
-  #endif
+   JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wcomma",
+                                        "-Wfloat-equal",
+                                        "-Wimplicit-fallthrough",
+                                        "-Wmaybe-uninitialized",
+                                        "-Wnull-pointer-subtraction",
+                                        "-Wsign-conversion",
+                                        "-Wtautological-constant-out-of-range-compare",
+                                        "-Wzero-as-null-pointer-constant")
 
+  #undef check
   using std::abs;
   #define NO_DUMMY_DECL
   #define PNGLCONF_H 1
@@ -67,11 +76,14 @@ namespace pnglibNamespace
   #define PNG_ARM_NEON_SUPPORTED
  #endif
 
+ #ifndef Byte
+  using Byte = uint8_t;
+ #endif
+
   #define PNG_16BIT_SUPPORTED
   #define PNG_ALIGNED_MEMORY_SUPPORTED
   #define PNG_BENIGN_ERRORS_SUPPORTED
   #define PNG_BENIGN_READ_ERRORS_SUPPORTED
-  #define PNG_BUILD_GRAYSCALE_PALETTE_SUPPORTED
   #define PNG_CHECK_FOR_INVALID_INDEX_SUPPORTED
   #define PNG_COLORSPACE_SUPPORTED
   #define PNG_CONSOLE_IO_SUPPORTED
@@ -87,7 +99,6 @@ namespace pnglibNamespace
   #define PNG_INCH_CONVERSIONS_SUPPORTED
   #define PNG_INFO_IMAGE_SUPPORTED
   #define PNG_IO_STATE_SUPPORTED
-  #define PNG_MNG_FEATURES_SUPPORTED
   #define PNG_POINTER_INDEXING_SUPPORTED
   #define PNG_PROGRESSIVE_READ_SUPPORTED
   #define PNG_READ_16BIT_SUPPORTED
@@ -251,6 +262,19 @@ namespace pnglibNamespace
   #define PNG_sCAL_PRECISION 5
   #define PNG_sRGB_PROFILE_CHECKS 2
 
+  #define PNG_LINKAGE_API
+  #define PNG_LINKAGE_FUNCTION
+
+  #define PNG_ARM_NEON_OPT 0
+
+  #if ! defined (PNG_USER_WIDTH_MAX)
+   #define PNG_USER_WIDTH_MAX 1000000
+  #endif
+
+  #if ! defined (PNG_USER_HEIGHT_MAX)
+   #define PNG_USER_HEIGHT_MAX 1000000
+  #endif
+
   #define png_debug(a, b)
   #define png_debug1(a, b, c)
   #define png_debug2(a, b, c, d)
@@ -266,6 +290,24 @@ namespace pnglibNamespace
   #include "pnglib/pngread.c"
   #include "pnglib/pngpread.c"
   #include "pnglib/pngrio.c"
+
+  void png_do_expand_palette (png_row_infop, png_bytep, png_const_colorp, png_const_bytep, int);
+  void png_do_expand (png_row_infop, png_bytep, png_const_color_16p);
+  void png_do_chop (png_row_infop, png_bytep);
+  void png_do_quantize (png_row_infop, png_bytep, png_const_bytep, png_const_bytep);
+  void png_do_gray_to_rgb (png_row_infop, png_bytep);
+  void png_do_unshift (png_row_infop, png_bytep, png_const_color_8p);
+  void png_do_unpack (png_row_infop, png_bytep);
+  int png_do_rgb_to_gray (png_structrp, png_row_infop, png_bytep);
+  void png_do_compose (png_row_infop, png_bytep, png_structrp);
+  void png_do_gamma (png_row_infop, png_bytep, png_structrp);
+  void png_do_encode_alpha (png_row_infop, png_bytep, png_structrp);
+  void png_do_scale_16_to_8 (png_row_infop, png_bytep);
+  void png_do_expand_16 (png_row_infop, png_bytep);
+  void png_do_read_filler (png_row_infop, png_bytep, png_uint_32, png_uint_32);
+  void png_do_read_invert_alpha (png_row_infop, png_bytep);
+  void png_do_read_swap_alpha (png_row_infop, png_bytep);
+
   #include "pnglib/pngrtran.c"
   #include "pnglib/pngrutil.c"
   #include "pnglib/pngset.c"
@@ -275,9 +317,8 @@ namespace pnglibNamespace
   #include "pnglib/pngwtran.c"
   #include "pnglib/pngwutil.c"
 
-  #if JUCE_CLANG
-   #pragma clang diagnostic pop
-  #endif
+  JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+
 #else
   extern "C"
   {
@@ -291,9 +332,7 @@ namespace pnglibNamespace
 #undef min
 #undef fdopen
 
-#if JUCE_MSVC
- #pragma warning (pop)
-#endif
+JUCE_END_IGNORE_WARNINGS_MSVC
 
 //==============================================================================
 namespace PNGHelpers
@@ -313,12 +352,158 @@ namespace PNGHelpers
 
     struct PNGErrorStruct {};
 
-    static void JUCE_CDECL errorCallback (png_structp, png_const_charp)
+    static void JUCE_CDECL errorCallback (png_structp p, png_const_charp)
     {
-        throw PNGErrorStruct();
+       #ifdef PNG_SETJMP_SUPPORTED
+        setjmp(png_jmpbuf(p));
+       #else
+        longjmp (*(jmp_buf*) p->error_ptr, 1);
+       #endif
     }
 
     static void JUCE_CDECL warningCallback (png_structp, png_const_charp) {}
+
+    JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4611)
+
+    static bool readHeader (InputStream& in, png_structp pngReadStruct, png_infop pngInfoStruct, jmp_buf& errorJumpBuf,
+                            png_uint_32& width, png_uint_32& height, int& bitDepth, int& colorType, int& interlaceType) noexcept
+    {
+        if (setjmp (errorJumpBuf) == 0)
+        {
+            // read the header..
+            png_set_read_fn (pngReadStruct, &in, readCallback);
+
+            png_read_info (pngReadStruct, pngInfoStruct);
+
+            png_get_IHDR (pngReadStruct, pngInfoStruct,
+                          &width, &height,
+                          &bitDepth, &colorType,
+                          &interlaceType, nullptr, nullptr);
+
+            if (bitDepth == 16)
+                png_set_strip_16 (pngReadStruct);
+
+            if (colorType == PNG_COLOR_TYPE_PALETTE)
+                png_set_expand (pngReadStruct);
+
+            if (bitDepth < 8)
+                png_set_expand (pngReadStruct);
+
+            if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA)
+                png_set_gray_to_rgb (pngReadStruct);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool readImageData (png_structp pngReadStruct, png_infop pngInfoStruct, jmp_buf& errorJumpBuf, png_bytepp rows) noexcept
+    {
+        if (setjmp (errorJumpBuf) == 0)
+        {
+            if (png_get_valid (pngReadStruct, pngInfoStruct, PNG_INFO_tRNS))
+                png_set_expand (pngReadStruct);
+
+            png_set_add_alpha (pngReadStruct, 0xff, PNG_FILLER_AFTER);
+
+            png_read_image (pngReadStruct, rows);
+            png_read_end (pngReadStruct, pngInfoStruct);
+            return true;
+        }
+
+        return false;
+    }
+
+    JUCE_END_IGNORE_WARNINGS_MSVC
+
+    static Image createImageFromData (bool hasAlphaChan, int width, int height, png_bytepp rows)
+    {
+        // now convert the data to a juce image format..
+        Image image (hasAlphaChan ? Image::ARGB : Image::RGB, width, height, hasAlphaChan);
+
+        image.getProperties()->set ("originalImageHadAlpha", image.hasAlphaChannel());
+        hasAlphaChan = image.hasAlphaChannel(); // (the native image creator may not give back what we expect)
+
+        const Image::BitmapData destData (image, Image::BitmapData::writeOnly);
+
+        for (int y = 0; y < (int) height; ++y)
+        {
+            const uint8* src = rows[y];
+            uint8* dest = destData.getLinePointer (y);
+
+            if (hasAlphaChan)
+            {
+                for (int i = (int) width; --i >= 0;)
+                {
+                    ((PixelARGB*) dest)->setARGB (src[3], src[0], src[1], src[2]);
+                    ((PixelARGB*) dest)->premultiply();
+                    dest += destData.pixelStride;
+                    src += 4;
+                }
+            }
+            else
+            {
+                for (int i = (int) width; --i >= 0;)
+                {
+                    ((PixelRGB*) dest)->setARGB (0, src[0], src[1], src[2]);
+                    dest += destData.pixelStride;
+                    src += 4;
+                }
+            }
+        }
+
+        return image;
+    }
+
+    static Image readImage (InputStream& in, png_structp pngReadStruct, png_infop pngInfoStruct)
+    {
+        jmp_buf errorJumpBuf;
+        png_set_error_fn (pngReadStruct, &errorJumpBuf, errorCallback, warningCallback);
+
+        png_uint_32 width = 0, height = 0;
+        int bitDepth = 0, colorType = 0, interlaceType = 0;
+
+        if (readHeader (in, pngReadStruct, pngInfoStruct, errorJumpBuf,
+                        width, height, bitDepth, colorType, interlaceType))
+        {
+            // Load the image into a temp buffer..
+            const size_t lineStride = width * 4;
+            HeapBlock<uint8> tempBuffer (height * lineStride);
+            HeapBlock<png_bytep> rows (height);
+
+            for (size_t y = 0; y < height; ++y)
+                rows[y] = (png_bytep) (tempBuffer + lineStride * y);
+
+            png_bytep trans_alpha = nullptr;
+            png_color_16p trans_color = nullptr;
+            int num_trans = 0;
+            png_get_tRNS (pngReadStruct, pngInfoStruct, &trans_alpha, &num_trans, &trans_color);
+
+            if (readImageData (pngReadStruct, pngInfoStruct, errorJumpBuf, rows))
+                return createImageFromData ((colorType & PNG_COLOR_MASK_ALPHA) != 0 || num_trans != 0,
+                                            (int) width, (int) height, rows);
+        }
+
+        return Image();
+    }
+
+    static Image readImage (InputStream& in)
+    {
+        if (png_structp pngReadStruct = png_create_read_struct (PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr))
+        {
+            if (png_infop pngInfoStruct = png_create_info_struct (pngReadStruct))
+            {
+                Image image (readImage (in, pngReadStruct, pngInfoStruct));
+                png_destroy_read_struct (&pngReadStruct, &pngInfoStruct, nullptr);
+                return image;
+            }
+
+            png_destroy_read_struct (&pngReadStruct, nullptr, nullptr);
+        }
+
+        return Image();
+    }
    #endif
 }
 
@@ -341,145 +526,38 @@ bool PNGImageFormat::canUnderstand (InputStream& in)
 }
 
 #if JUCE_USING_COREIMAGE_LOADER
- Image juce_loadWithCoreImage (InputStream& input);
+ Image juce_loadWithCoreImage (InputStream&);
 #endif
 
 Image PNGImageFormat::decodeImage (InputStream& in)
 {
-#if JUCE_USING_COREIMAGE_LOADER
+   #if JUCE_USING_COREIMAGE_LOADER
     return juce_loadWithCoreImage (in);
-#else
-    using namespace pnglibNamespace;
-    Image image;
-
-    if (png_structp pngReadStruct = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0))
-    {
-        try
-        {
-            png_infop pngInfoStruct = png_create_info_struct (pngReadStruct);
-
-            if (pngInfoStruct == nullptr)
-            {
-                png_destroy_read_struct (&pngReadStruct, 0, 0);
-                return Image::null;
-            }
-
-            png_set_error_fn (pngReadStruct, 0, PNGHelpers::errorCallback, PNGHelpers::warningCallback);
-
-            // read the header..
-            png_set_read_fn (pngReadStruct, &in, PNGHelpers::readCallback);
-
-            png_uint_32 width = 0, height = 0;
-            int bitDepth = 0, colorType = 0, interlaceType;
-
-            png_read_info (pngReadStruct, pngInfoStruct);
-
-            png_get_IHDR (pngReadStruct, pngInfoStruct,
-                          &width, &height,
-                          &bitDepth, &colorType,
-                          &interlaceType, 0, 0);
-
-            if (bitDepth == 16)
-                png_set_strip_16 (pngReadStruct);
-
-            if (colorType == PNG_COLOR_TYPE_PALETTE)
-                png_set_expand (pngReadStruct);
-
-            if (bitDepth < 8)
-                png_set_expand (pngReadStruct);
-
-            if (png_get_valid (pngReadStruct, pngInfoStruct, PNG_INFO_tRNS))
-                png_set_expand (pngReadStruct);
-
-            if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA)
-                png_set_gray_to_rgb (pngReadStruct);
-
-            png_set_add_alpha (pngReadStruct, 0xff, PNG_FILLER_AFTER);
-
-            bool hasAlphaChan = (colorType & PNG_COLOR_MASK_ALPHA) != 0
-                                  || pngInfoStruct->num_trans > 0;
-
-            // Load the image into a temp buffer in the pnglib format..
-            const size_t lineStride = width * 4;
-            HeapBlock<uint8> tempBuffer (height * lineStride);
-
-            HeapBlock<png_bytep> rows (height);
-            for (size_t y = 0; y < height; ++y)
-                rows[y] = (png_bytep) (tempBuffer + lineStride * y);
-
-            try
-            {
-                png_read_image (pngReadStruct, rows);
-                png_read_end (pngReadStruct, pngInfoStruct);
-            }
-            catch (PNGHelpers::PNGErrorStruct&)
-            {}
-
-            png_destroy_read_struct (&pngReadStruct, &pngInfoStruct, 0);
-
-            // now convert the data to a juce image format..
-            image = Image (hasAlphaChan ? Image::ARGB : Image::RGB,
-                           (int) width, (int) height, hasAlphaChan);
-
-            image.getProperties()->set ("originalImageHadAlpha", image.hasAlphaChannel());
-            hasAlphaChan = image.hasAlphaChannel(); // (the native image creator may not give back what we expect)
-
-            const Image::BitmapData destData (image, Image::BitmapData::writeOnly);
-
-            for (int y = 0; y < (int) height; ++y)
-            {
-                const uint8* src = rows[y];
-                uint8* dest = destData.getLinePointer (y);
-
-                if (hasAlphaChan)
-                {
-                    for (int i = (int) width; --i >= 0;)
-                    {
-                        ((PixelARGB*) dest)->setARGB (src[3], src[0], src[1], src[2]);
-                        ((PixelARGB*) dest)->premultiply();
-                        dest += destData.pixelStride;
-                        src += 4;
-                    }
-                }
-                else
-                {
-                    for (int i = (int) width; --i >= 0;)
-                    {
-                        ((PixelRGB*) dest)->setARGB (0, src[0], src[1], src[2]);
-                        dest += destData.pixelStride;
-                        src += 4;
-                    }
-                }
-            }
-        }
-        catch (PNGHelpers::PNGErrorStruct&)
-        {}
-    }
-
-    return image;
-#endif
+   #else
+    return PNGHelpers::readImage (in);
+   #endif
 }
 
 bool PNGImageFormat::writeImageToStream (const Image& image, OutputStream& out)
 {
     using namespace pnglibNamespace;
-    const int width = image.getWidth();
-    const int height = image.getHeight();
+    auto width = image.getWidth();
+    auto height = image.getHeight();
 
-    png_structp pngWriteStruct = png_create_write_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
+    auto pngWriteStruct = png_create_write_struct (PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
 
     if (pngWriteStruct == nullptr)
         return false;
 
-    png_infop pngInfoStruct = png_create_info_struct (pngWriteStruct);
+    auto pngInfoStruct = png_create_info_struct (pngWriteStruct);
 
     if (pngInfoStruct == nullptr)
     {
-        png_destroy_write_struct (&pngWriteStruct, (png_infopp) nullptr);
+        png_destroy_write_struct (&pngWriteStruct, nullptr);
         return false;
     }
 
-    png_set_write_fn (pngWriteStruct, &out, PNGHelpers::writeDataCallback, 0);
+    png_set_write_fn (pngWriteStruct, &out, PNGHelpers::writeDataCallback, nullptr);
 
     png_set_IHDR (pngWriteStruct, pngInfoStruct, (png_uint_32) width, (png_uint_32) height, 8,
                   image.hasAlphaChannel() ? PNG_COLOR_TYPE_RGB_ALPHA
@@ -488,12 +566,13 @@ bool PNGImageFormat::writeImageToStream (const Image& image, OutputStream& out)
                   PNG_COMPRESSION_TYPE_BASE,
                   PNG_FILTER_TYPE_BASE);
 
-    HeapBlock <uint8> rowData ((size_t) width * 4);
+    HeapBlock<uint8> rowData (width * 4);
 
     png_color_8 sig_bit;
-    sig_bit.red = 8;
+    sig_bit.red   = 8;
     sig_bit.green = 8;
-    sig_bit.blue = 8;
+    sig_bit.blue  = 8;
+    sig_bit.gray  = 0;
     sig_bit.alpha = 8;
     png_set_sBIT (pngWriteStruct, pngInfoStruct, &sig_bit);
 
@@ -543,3 +622,5 @@ bool PNGImageFormat::writeImageToStream (const Image& image, OutputStream& out)
 
     return true;
 }
+
+} // namespace juce

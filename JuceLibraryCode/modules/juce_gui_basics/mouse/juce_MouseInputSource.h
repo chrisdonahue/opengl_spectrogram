@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_MOUSEINPUTSOURCE_H_INCLUDED
-#define JUCE_MOUSEINPUTSOURCE_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -34,7 +34,7 @@
     Each MouseEvent object contains a reference to the MouseInputSource that generated
     it. In an environment with a single mouse for input, all events will come from the
     same source, but in a multi-touch system, there may be multiple MouseInputSource
-    obects active, each representing a stream of events coming from a particular finger.
+    objects active, each representing a stream of events coming from a particular finger.
 
     Events coming from a single MouseInputSource are always sent in a fixed and predictable
     order: a mouseMove will never be called without a mouseEnter having been sent beforehand,
@@ -45,10 +45,20 @@
     method to find out which finger each event came from.
 
     @see MouseEvent
+
+    @tags{GUI}
 */
-class JUCE_API  MouseInputSource
+class JUCE_API  MouseInputSource  final
 {
 public:
+    /** Possible mouse input sources. */
+    enum InputSourceType
+    {
+        mouse,
+        touch,
+        pen
+    };
+
     //==============================================================================
     MouseInputSource (const MouseInputSource&) noexcept;
     MouseInputSource& operator= (const MouseInputSource&) noexcept;
@@ -59,19 +69,25 @@ public:
     bool operator!= (const MouseInputSource& other) const noexcept     { return pimpl != other.pimpl; }
 
     //==============================================================================
-    /** Returns true if this object represents a normal desk-based mouse device. */
-    bool isMouse() const;
+    /** Returns the type of input source that this object represents. */
+    MouseInputSource::InputSourceType getType() const noexcept;
 
-    /** Returns true if this object represents a source of touch events - i.e. a finger or stylus. */
-    bool isTouch() const;
+    /** Returns true if this object represents a normal desk-based mouse device. */
+    bool isMouse() const noexcept;
+
+    /** Returns true if this object represents a source of touch events. */
+    bool isTouch() const noexcept;
+
+    /** Returns true if this object represents a pen device. */
+    bool isPen() const noexcept;
 
     /** Returns true if this source has an on-screen pointer that can hover over
         items without clicking them.
     */
-    bool canHover() const;
+    bool canHover() const noexcept;
 
     /** Returns true if this source may have a scroll wheel. */
-    bool hasMouseWheel() const;
+    bool hasMouseWheel() const noexcept;
 
     /** Returns this source's index in the global list of possible sources.
         If the system only has a single mouse, there will only be a single MouseInputSource
@@ -82,18 +98,57 @@ public:
         number 0, and then if a second touch happens while the first is still down, it
         will have index 1, etc.
     */
-    int getIndex() const;
+    int getIndex() const noexcept;
 
     /** Returns true if this device is currently being pressed. */
-    bool isDragging() const;
+    bool isDragging() const noexcept;
 
     /** Returns the last-known screen position of this source. */
-    Point<int> getScreenPosition() const;
+    Point<float> getScreenPosition() const noexcept;
+
+    /** Returns the last-known screen position of this source without any scaling applied. */
+    Point<float> getRawScreenPosition() const noexcept;
 
     /** Returns a set of modifiers that indicate which buttons are currently
         held down on this device.
     */
-    ModifierKeys getCurrentModifiers() const;
+    ModifierKeys getCurrentModifiers() const noexcept;
+
+    /** Returns the device's current touch or pen pressure.
+        The range is 0 (soft) to 1 (hard).
+        If the input device doesn't provide any pressure data, it may return a negative
+        value here, or 0.0 or 1.0, depending on the platform.
+    */
+    float getCurrentPressure() const noexcept;
+
+    /** Returns the device's current orientation in radians. 0 indicates a touch pointer
+        aligned with the x-axis and pointing from left to right; increasing values indicate
+        rotation in the clockwise direction. Only reported by a touch pointer.
+    */
+    float getCurrentOrientation() const noexcept;
+
+    /** Returns the device's current rotation. Indicates the clockwise rotation, or twist, of the pointer
+        in radians. The default is 0. Only reported by a pen pointer.
+    */
+    float getCurrentRotation() const noexcept;
+
+    /** Returns the angle of tilt of the pointer in a range of -1.0 to 1.0 either in the x- or y-axis. The default is 0.
+        If x-axis, a positive value indicates a tilt to the right and if y-axis, a positive value indicates a tilt toward the user.
+        Only reported by a pen pointer.
+    */
+    float getCurrentTilt (bool tiltX) const noexcept;
+
+    /** Returns true if the current pressure value is meaningful. */
+    bool isPressureValid() const noexcept;
+
+    /** Returns true if the current orientation value is meaningful. */
+    bool isOrientationValid() const noexcept;
+
+    /** Returns true if the current rotation value is meaningful. */
+    bool isRotationValid() const noexcept;
+
+    /** Returns true if the current tilt value (either x- or y-axis) is meaningful. */
+    bool isTiltValid (bool tiltX) const noexcept;
 
     /** Returns the component that was last known to be under this pointer. */
     Component* getComponentUnderMouse() const;
@@ -114,12 +169,14 @@ public:
     Time getLastMouseDownTime() const noexcept;
 
     /** Returns the screen position at which the last mouse-down occurred. */
-    Point<int> getLastMouseDownPosition() const noexcept;
+    Point<float> getLastMouseDownPosition() const noexcept;
 
-    /** Returns true if this mouse is currently down, and if it has been dragged more
-        than a couple of pixels from the place it was pressed.
-    */
-    bool hasMouseMovedSignificantlySincePressed() const noexcept;
+    /** Returns true if this input source represents a long-press or drag interaction i.e. it has been held down for a significant
+        amount of time or it has been dragged more than a couple of pixels from the place it was pressed. */
+    bool isLongPressOrDrag() const noexcept;
+
+    /** Returns true if this input source has been dragged more than a couple of pixels from the place it was pressed. */
+    bool hasMovedSignificantlySincePressed() const noexcept;
 
     /** Returns true if this input source uses a visible mouse cursor. */
     bool hasMouseCursor() const noexcept;
@@ -162,27 +219,88 @@ public:
     bool isUnboundedMouseMovementEnabled() const;
 
     /** Attempts to set this mouse pointer's screen position. */
-    void setScreenPosition (Point<int> newPosition);
+    void setScreenPosition (Point<float> newPosition);
+
+    /** A default value for pressure, which is used when a device doesn't support it, or for
+        mouse-moves, mouse-ups, etc.
+    */
+    static constexpr float defaultPressure = 0.0f;
+
+    /** A default value for orientation, which is used when a device doesn't support it */
+    static constexpr float defaultOrientation = 0.0f;
+
+    /** A default value for rotation, which is used when a device doesn't support it */
+    static constexpr float defaultRotation = 0.0f;
+
+    /** Default values for tilt, which are used when a device doesn't support it */
+    static constexpr float defaultTiltX = 0.0f;
+    static constexpr float defaultTiltY = 0.0f;
+
+    /** A default value for pressure, which is used when a device doesn't support it.
+
+        This is a valid value, returning true when calling isPressureValid() hence the
+        deprecation. Use defaultPressure instead.
+    */
+    [[deprecated ("Use defaultPressure instead.")]]
+    static const float invalidPressure;
+
+    /** A default value for orientation, which is used when a device doesn't support it.
+
+        This is a valid value, returning true when calling isOrientationValid() hence the
+        deprecation. Use defaultOrientation instead.
+    */
+    [[deprecated ("Use defaultOrientation instead.")]]
+    static const float invalidOrientation;
+
+    /** A default value for rotation, which is used when a device doesn't support it.
+
+        This is a valid value, returning true when calling isRotationValid() hence the
+        deprecation. Use defaultRotation instead.
+    */
+    [[deprecated ("Use defaultRotation instead.")]]
+    static const float invalidRotation;
+
+    /** Default values for tilt, which are used when a device doesn't support it
+
+        These are valid values, returning true when calling isTiltValid() hence the
+        deprecation. Use defaultTiltX and defaultTiltY instead.
+    */
+    [[deprecated ("Use defaultTiltX instead.")]]
+    static const float invalidTiltX;
+    [[deprecated ("Use defaultTiltY instead.")]]
+    static const float invalidTiltY;
+
+    /** An offscreen mouse position used when triggering mouse exits where we don't want to move
+        the cursor over an existing component.
+    */
+    static const Point<float> offscreenMousePos;
+
+    //==============================================================================
+   #ifndef DOXYGEN
+    [[deprecated ("This method has been replaced with the isLongPressOrDrag and hasMovedSignificantlySincePressed "
+                 "methods. If you want the same behaviour you should use isLongPressOrDrag which accounts for the "
+                 "amount of time that the input source has been held down for, but if you only want to know whether "
+                 "it has been moved use hasMovedSignificantlySincePressed instead.")]]
+    bool hasMouseMovedSignificantlySincePressed() const noexcept;
+   #endif
 
 private:
     //==============================================================================
     friend class ComponentPeer;
     friend class Desktop;
-    friend class MouseInputSourceInternal;
-    MouseInputSourceInternal* pimpl;
+    friend class detail::MouseInputSourceList;
+    friend class detail::MouseInputSourceImpl;
+    detail::MouseInputSourceImpl* pimpl;
 
-    struct SourceList;
+    explicit MouseInputSource (detail::MouseInputSourceImpl*) noexcept;
+    void handleEvent (ComponentPeer&, Point<float>, int64 time, ModifierKeys, float, float, const PenDetails&);
+    void handleWheel (ComponentPeer&, Point<float>, int64 time, const MouseWheelDetails&);
+    void handleMagnifyGesture (ComponentPeer&, Point<float>, int64 time, float scaleFactor);
 
-    explicit MouseInputSource (MouseInputSourceInternal*) noexcept;
-    void handleEvent (ComponentPeer&, Point<int>, int64 time, const ModifierKeys);
-    void handleWheel (ComponentPeer&, Point<int>, int64 time, const MouseWheelDetails&);
-    void handleMagnifyGesture (ComponentPeer&, Point<int>, int64 time, float scaleFactor);
-
-    static Point<int> getCurrentRawMousePosition();
-    static void setRawMousePosition (Point<int>);
+    static Point<float> getCurrentRawMousePosition();
+    static void setRawMousePosition (Point<float>);
 
     JUCE_LEAK_DETECTOR (MouseInputSource)
 };
 
-
-#endif   // JUCE_MOUSEINPUTSOURCE_H_INCLUDED
+} // namespace juce

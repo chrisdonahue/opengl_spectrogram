@@ -2,33 +2,35 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_OPENGLFRAMEBUFFER_H_INCLUDED
-#define JUCE_OPENGLFRAMEBUFFER_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
     Creates an openGL frame buffer.
+
+    @tags{OpenGL}
 */
 class JUCE_API  OpenGLFrameBuffer
 {
@@ -95,35 +97,16 @@ public:
     void releaseAsRenderingTarget();
 
     /** Returns the ID of this framebuffer, or 0 if it isn't initialised. */
-    GLuint getFrameBufferID() const;
+    GLuint getFrameBufferID() const noexcept;
 
     /** Returns the current frame buffer ID for the current context. */
-    static GLuint getCurrentFrameBufferTarget();
+    static GLuint getCurrentFrameBufferTarget() noexcept;
 
     /** Clears the framebuffer with the specified colour. */
     void clear (Colour colour);
 
     /** Selects the framebuffer as the current target, and clears it to transparent. */
     void makeCurrentAndClear();
-
-   #if JUCE_USE_OPENGL_FIXED_FUNCTION
-    /** Draws this framebuffer onto the current context, with the specified corner positions. */
-    void draw2D (float x1, float y1,
-                 float x2, float y2,
-                 float x3, float y3,
-                 float x4, float y4,
-                 Colour colour) const;
-
-    /** Draws this framebuffer onto the current context, with the specified corner positions. */
-    void draw3D (float x1, float y1, float z1,
-                 float x2, float y2, float z2,
-                 float x3, float y3, float z3,
-                 float x4, float y4, float z4,
-                 Colour colour) const;
-
-    /** Draws the framebuffer at a given position. */
-    void drawAt (float x1, float y1) const;
-   #endif
 
     /** Reads an area of pixels from the framebuffer into a 32-bit ARGB pixel array.
         The lineStride is measured as a number of pixels, not bytes - pass a stride
@@ -139,15 +122,12 @@ public:
 
 private:
     class Pimpl;
-    friend struct ContainerDeletePolicy<Pimpl>;
-    ScopedPointer<Pimpl> pimpl;
+    std::unique_ptr<Pimpl> pimpl;
 
     class SavedState;
-    friend struct ContainerDeletePolicy<SavedState>;
-    ScopedPointer<SavedState> savedState;
+    std::unique_ptr<SavedState> savedState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenGLFrameBuffer)
 };
 
-
-#endif   // JUCE_OPENGLFRAMEBUFFER_H_INCLUDED
+} // namespace juce

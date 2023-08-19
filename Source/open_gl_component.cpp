@@ -8,8 +8,14 @@
   ==============================================================================
 */
 
+#include <JuceHeader.h>
+
+using namespace juce;
+using namespace juce::gl;
+
 #include "open_gl_component.h"
 #include "spectrogram_component.h"
+
 
 //==============================================================================
 open_gl_component::open_gl_component()

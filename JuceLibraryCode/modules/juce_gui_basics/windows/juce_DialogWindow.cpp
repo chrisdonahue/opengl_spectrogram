@@ -2,44 +2,56 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 DialogWindow::DialogWindow (const String& name, Colour colour,
-                            const bool escapeCloses, const bool onDesktop)
+                            const bool escapeCloses, const bool onDesktop,
+                            const float scale)
     : DocumentWindow (name, colour, DocumentWindow::closeButton, onDesktop),
+      desktopScale (scale),
       escapeKeyTriggersCloseButton (escapeCloses)
 {
 }
 
-DialogWindow::~DialogWindow()
-{
-}
+DialogWindow::~DialogWindow() = default;
 
-bool DialogWindow::keyPressed (const KeyPress& key)
+bool DialogWindow::escapeKeyPressed()
 {
-    if (escapeKeyTriggersCloseButton && key == KeyPress::escapeKey)
+    if (escapeKeyTriggersCloseButton)
     {
         setVisible (false);
         return true;
     }
+
+    return false;
+}
+
+bool DialogWindow::keyPressed (const KeyPress& key)
+{
+    if (key == KeyPress::escapeKey && escapeKeyPressed())
+        return true;
 
     return DocumentWindow::keyPressed (key);
 }
@@ -50,7 +62,7 @@ void DialogWindow::resized()
 
     if (escapeKeyTriggersCloseButton)
     {
-        if (Button* const close = getCloseButton())
+        if (auto* close = getCloseButton())
         {
             const KeyPress esc (KeyPress::escapeKey, 0, 0);
 
@@ -66,11 +78,11 @@ class DefaultDialogWindow   : public DialogWindow
 public:
     DefaultDialogWindow (LaunchOptions& options)
         : DialogWindow (options.dialogTitle, options.dialogBackgroundColour,
-                        options.escapeKeyTriggersCloseButton, true)
+                        options.escapeKeyTriggersCloseButton, true,
+                        options.componentToCentreAround != nullptr
+                            ? Component::getApproximateScaleFactorForComponent (options.componentToCentreAround)
+                            : 1.0f)
     {
-        setUsingNativeTitleBar (options.useNativeTitleBar);
-        setAlwaysOnTop (juce_areThereAnyAlwaysOnTopWindows());
-
         if (options.content.willDeleteObject())
             setContentOwned (options.content.release(), true);
         else
@@ -78,6 +90,9 @@ public:
 
         centreAroundComponent (options.componentToCentreAround, getWidth(), getHeight());
         setResizable (options.resizable, options.useBottomRightCornerResizer);
+
+        setUsingNativeTitleBar (options.useNativeTitleBar);
+        setAlwaysOnTop (WindowUtils::areThereAnyAlwaysOnTopWindows());
     }
 
     void closeButtonPressed() override
@@ -89,15 +104,7 @@ private:
     JUCE_DECLARE_NON_COPYABLE (DefaultDialogWindow)
 };
 
-DialogWindow::LaunchOptions::LaunchOptions() noexcept
-    : dialogBackgroundColour (Colours::lightgrey),
-      componentToCentreAround (nullptr),
-      escapeKeyTriggersCloseButton (true),
-      useNativeTitleBar (true),
-      resizable (true),
-      useBottomRightCornerResizer (false)
-{
-}
+DialogWindow::LaunchOptions::LaunchOptions() noexcept {}
 
 DialogWindow* DialogWindow::LaunchOptions::create()
 {
@@ -108,12 +115,12 @@ DialogWindow* DialogWindow::LaunchOptions::create()
 
 DialogWindow* DialogWindow::LaunchOptions::launchAsync()
 {
-    DialogWindow* const d = create();
+    auto* d = create();
     d->enterModalState (true, nullptr, true);
     return d;
 }
 
-#if JUCE_MODAL_LOOPS_PERMITTED || DOXYGEN
+#if JUCE_MODAL_LOOPS_PERMITTED
 int DialogWindow::LaunchOptions::runModal()
 {
     return launchAsync()->runModalLoop();
@@ -164,3 +171,11 @@ int DialogWindow::showModalDialog (const String& dialogTitle,
     return o.runModal();
 }
 #endif
+
+//==============================================================================
+std::unique_ptr<AccessibilityHandler> DialogWindow::createAccessibilityHandler()
+{
+    return std::make_unique<AccessibilityHandler> (*this, AccessibilityRole::dialogWindow);
+}
+
+} // namespace juce

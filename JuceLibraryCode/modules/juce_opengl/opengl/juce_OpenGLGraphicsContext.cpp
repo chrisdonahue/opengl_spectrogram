@@ -2,29 +2,214 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
+extern void (*clearOpenGLGlyphCache)(); // declared in juce_graphics
+
 namespace OpenGLRendering
 {
 
+struct TextureInfo
+{
+    GLuint textureID;
+    int imageWidth, imageHeight;
+    float fullWidthProportion, fullHeightProportion;
+};
+
+//==============================================================================
+// This list persists in the OpenGLContext, and will re-use cached textures which
+// are created from Images.
+struct CachedImageList  : public ReferenceCountedObject,
+                          private ImagePixelData::Listener
+{
+    CachedImageList (OpenGLContext& c) noexcept
+        : context (c), maxCacheSize (c.getImageCacheSize()) {}
+
+    static CachedImageList* get (OpenGLContext& c)
+    {
+        const char cacheValueID[] = "CachedImages";
+        auto list = static_cast<CachedImageList*> (c.getAssociatedObject (cacheValueID));
+
+        if (list == nullptr)
+        {
+            list = new CachedImageList (c);
+            c.setAssociatedObject (cacheValueID, list);
+        }
+
+        return list;
+    }
+
+    TextureInfo getTextureFor (const Image& image)
+    {
+        auto pixelData = image.getPixelData();
+        auto* c = findCachedImage (pixelData);
+
+        if (c == nullptr)
+        {
+            if (auto fb = OpenGLImageType::getFrameBufferFrom (image))
+            {
+                TextureInfo t;
+                t.textureID = fb->getTextureID();
+                t.imageWidth = image.getWidth();
+                t.imageHeight = image.getHeight();
+                t.fullWidthProportion  = 1.0f;
+                t.fullHeightProportion = 1.0f;
+
+                return t;
+            }
+
+            c = images.add (new CachedImage (*this, pixelData));
+            totalSize += c->imageSize;
+
+            while (totalSize > maxCacheSize && images.size() > 1 && totalSize > 0)
+                removeOldestItem();
+        }
+
+        return c->getTextureInfo();
+    }
+
+    struct CachedImage
+    {
+        CachedImage (CachedImageList& list, ImagePixelData* im)
+            : owner (list), pixelData (im),
+              lastUsed (Time::getCurrentTime()),
+              imageSize ((size_t) (im->width * im->height))
+        {
+            pixelData->listeners.add (&owner);
+        }
+
+        ~CachedImage()
+        {
+            if (pixelData != nullptr)
+                pixelData->listeners.remove (&owner);
+        }
+
+        TextureInfo getTextureInfo()
+        {
+            if (pixelData == nullptr)
+                return {};
+
+            TextureInfo t;
+
+            if (textureNeedsReloading)
+            {
+                textureNeedsReloading = false;
+                texture.loadImage (Image (*pixelData));
+            }
+
+            t.textureID = texture.getTextureID();
+            t.imageWidth = pixelData->width;
+            t.imageHeight = pixelData->height;
+            t.fullWidthProportion  = (float) t.imageWidth  / (float) texture.getWidth();
+            t.fullHeightProportion = (float) t.imageHeight / (float) texture.getHeight();
+
+            lastUsed = Time::getCurrentTime();
+            return t;
+        }
+
+        CachedImageList& owner;
+        ImagePixelData* pixelData;
+        OpenGLTexture texture;
+        Time lastUsed;
+        const size_t imageSize;
+        bool textureNeedsReloading = true;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CachedImage)
+    };
+
+    using Ptr = ReferenceCountedObjectPtr<CachedImageList>;
+
+private:
+    OpenGLContext& context;
+    OwnedArray<CachedImage> images;
+    size_t totalSize = 0;
+    const size_t maxCacheSize;
+
+    bool canUseContext() const noexcept
+    {
+        return OpenGLContext::getCurrentContext() == &context;
+    }
+
+    void imageDataChanged (ImagePixelData* im) override
+    {
+        if (auto* c = findCachedImage (im))
+            c->textureNeedsReloading = true;
+    }
+
+    void imageDataBeingDeleted (ImagePixelData* im) override
+    {
+        for (int i = images.size(); --i >= 0;)
+        {
+            auto& ci = *images.getUnchecked(i);
+
+            if (ci.pixelData == im)
+            {
+                if (canUseContext())
+                {
+                    totalSize -= ci.imageSize;
+                    images.remove (i);
+                }
+                else
+                {
+                    ci.pixelData = nullptr;
+                }
+
+                break;
+            }
+        }
+    }
+
+    CachedImage* findCachedImage (ImagePixelData* pixelData) const
+    {
+        for (auto& i : images)
+            if (i->pixelData == pixelData)
+                return i;
+
+        return {};
+    }
+
+    void removeOldestItem()
+    {
+        CachedImage* oldest = nullptr;
+
+        for (auto& i : images)
+            if (oldest == nullptr || i->lastUsed < oldest->lastUsed)
+                oldest = i;
+
+        if (oldest != nullptr)
+        {
+            totalSize -= oldest->imageSize;
+            images.removeObject (oldest);
+        }
+    }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CachedImageList)
+};
+
+
+//==============================================================================
 struct Target
 {
     Target (OpenGLContext& c, GLuint fbID, int width, int height) noexcept
@@ -65,13 +250,10 @@ struct Target
     Rectangle<int> bounds;
 };
 
-#if JUCE_USE_OPENGL_SHADERS
-
 //==============================================================================
-class PositionedTexture
+struct PositionedTexture
 {
-public:
-    PositionedTexture (OpenGLTexture& texture, const EdgeTable& et, const Rectangle<int>& clipRegion)
+    PositionedTexture (OpenGLTexture& texture, const EdgeTable& et, Rectangle<int> clipRegion)
         : clip (clipRegion.getIntersection (et.getMaximumBounds()))
     {
         if (clip.contains (et.getMaximumBounds()))
@@ -86,7 +268,7 @@ public:
         }
     }
 
-    PositionedTexture (GLuint texture, const Rectangle<int> r, const Rectangle<int> clipRegion) noexcept
+    PositionedTexture (GLuint texture, Rectangle<int> r, Rectangle<int> clipRegion) noexcept
         : textureID (texture), area (r), clip (clipRegion)
     {}
 
@@ -108,7 +290,7 @@ private:
             : area (et.getMaximumBounds().withSize (nextPowerOfTwo (et.getMaximumBounds().getWidth()),
                                                     nextPowerOfTwo (et.getMaximumBounds().getHeight())))
         {
-            data.calloc ((size_t) (area.getWidth() * area.getHeight()));
+            data.calloc (area.getWidth() * area.getHeight());
             et.iterate (*this);
         }
 
@@ -137,6 +319,24 @@ private:
             memset (currentLine + x, 255, (size_t) width);
         }
 
+        void handleEdgeTableRectangle (int x, int y, int width, int height, int alphaLevel) noexcept
+        {
+            while (--height >= 0)
+            {
+                setEdgeTableYPos (y++);
+                handleEdgeTableLine (x, width, alphaLevel);
+            }
+        }
+
+        void handleEdgeTableRectangleFull (int x, int y, int width, int height) noexcept
+        {
+            while (--height >= 0)
+            {
+                setEdgeTableYPos (y++);
+                handleEdgeTableLineFull (x, width);
+            }
+        }
+
         HeapBlock<uint8> data;
         const Rectangle<int> area;
 
@@ -148,9 +348,8 @@ private:
 };
 
 //==============================================================================
-class ShaderPrograms  : public ReferenceCountedObject
+struct ShaderPrograms  : public ReferenceCountedObject
 {
-public:
     ShaderPrograms (OpenGLContext& context)
         : solidColourProgram (context),
           solidColourMasked (context),
@@ -168,69 +367,78 @@ public:
           maskTexture (context)
     {}
 
-    typedef ReferenceCountedObjectPtr<ShaderPrograms> Ptr;
+    using Ptr = ReferenceCountedObjectPtr<ShaderPrograms>;
 
     //==============================================================================
     struct ShaderProgramHolder
     {
-        ShaderProgramHolder (OpenGLContext& context, const char* fragmentShader)
+        ShaderProgramHolder (OpenGLContext& context, const char* fragmentShader, const char* vertexShader)
             : program (context)
         {
             JUCE_CHECK_OPENGL_ERROR
-            program.addVertexShader ("attribute vec2 position;"
-                                     "attribute vec4 colour;"
-                                     "uniform vec4 screenBounds;"
-                                     "varying " JUCE_MEDIUMP " vec4 frontColour;"
-                                     "varying " JUCE_HIGHP " vec2 pixelPos;"
-                                     "void main()"
-                                     "{"
-                                     " frontColour = colour;"
-                                     " vec2 adjustedPos = position - screenBounds.xy;"
-                                     " pixelPos = adjustedPos;"
-                                     " vec2 scaledPos = adjustedPos / screenBounds.zw;"
-                                     " gl_Position = vec4 (scaledPos.x - 1.0, 1.0 - scaledPos.y, 0, 1.0);"
-                                     "}");
 
-            program.addFragmentShader (fragmentShader);
-            program.link();
-            JUCE_CHECK_OPENGL_ERROR
+            if (vertexShader == nullptr)
+                vertexShader = "attribute vec2 position;"
+                               "attribute vec4 colour;"
+                               "uniform vec4 screenBounds;"
+                               "varying " JUCE_MEDIUMP " vec4 frontColour;"
+                               "varying " JUCE_HIGHP " vec2 pixelPos;"
+                               "void main()"
+                               "{"
+                                 "frontColour = colour;"
+                                 "vec2 adjustedPos = position - screenBounds.xy;"
+                                 "pixelPos = adjustedPos;"
+                                 "vec2 scaledPos = adjustedPos / screenBounds.zw;"
+                                 "gl_Position = vec4 (scaledPos.x - 1.0, 1.0 - scaledPos.y, 0, 1.0);"
+                               "}";
+
+            if (program.addVertexShader (OpenGLHelpers::translateVertexShaderToV3 (vertexShader))
+                 && program.addFragmentShader (OpenGLHelpers::translateFragmentShaderToV3 (fragmentShader))
+                 && program.link())
+            {
+                JUCE_CHECK_OPENGL_ERROR
+            }
+            else
+            {
+                lastError = program.getLastError();
+            }
         }
 
         OpenGLShaderProgram program;
+        String lastError;
     };
 
     struct ShaderBase   : public ShaderProgramHolder
     {
-        ShaderBase (OpenGLContext& context, const char* fragmentShader)
-            : ShaderProgramHolder (context, fragmentShader),
+        ShaderBase (OpenGLContext& context, const char* fragmentShader, const char* vertexShader = nullptr)
+            : ShaderProgramHolder (context, fragmentShader, vertexShader),
               positionAttribute (program, "position"),
               colourAttribute (program, "colour"),
               screenBounds (program, "screenBounds")
         {}
 
-        void set2DBounds (const Rectangle<float>& bounds)
+        void set2DBounds (Rectangle<float> bounds)
         {
             screenBounds.set (bounds.getX(), bounds.getY(), 0.5f * bounds.getWidth(), 0.5f * bounds.getHeight());
         }
 
-        void bindAttributes (OpenGLContext& context)
+        void bindAttributes()
         {
-            context.extensions.glVertexAttribPointer ((GLuint) positionAttribute.attributeID, 2, GL_SHORT, GL_FALSE, 8, (void*) 0);
-            context.extensions.glVertexAttribPointer ((GLuint) colourAttribute.attributeID, 4, GL_UNSIGNED_BYTE, GL_TRUE, 8, (void*) 4);
-            context.extensions.glEnableVertexAttribArray ((GLuint) positionAttribute.attributeID);
-            context.extensions.glEnableVertexAttribArray ((GLuint) colourAttribute.attributeID);
+            gl::glVertexAttribPointer ((GLuint) positionAttribute.attributeID, 2, GL_SHORT, GL_FALSE, 8, nullptr);
+            gl::glVertexAttribPointer ((GLuint) colourAttribute.attributeID, 4, GL_UNSIGNED_BYTE, GL_TRUE, 8, (void*) 4);
+            gl::glEnableVertexAttribArray ((GLuint) positionAttribute.attributeID);
+            gl::glEnableVertexAttribArray ((GLuint) colourAttribute.attributeID);
         }
 
-        void unbindAttributes (OpenGLContext& context)
+        void unbindAttributes()
         {
-            context.extensions.glDisableVertexAttribArray ((GLuint) positionAttribute.attributeID);
-            context.extensions.glDisableVertexAttribArray ((GLuint) colourAttribute.attributeID);
+            gl::glDisableVertexAttribArray ((GLuint) positionAttribute.attributeID);
+            gl::glDisableVertexAttribArray ((GLuint) colourAttribute.attributeID);
         }
 
         OpenGLShaderProgram::Attribute positionAttribute, colourAttribute;
-
-    private:
         OpenGLShaderProgram::Uniform screenBounds;
+        std::function<void (OpenGLShaderProgram&)> onShaderActivated;
     };
 
     struct MaskedShaderParams
@@ -240,7 +448,7 @@ public:
               maskBounds  (program, "maskBounds")
         {}
 
-        void setBounds (const Rectangle<int>& area, const Target& target, const GLint textureIndex) const
+        void setBounds (Rectangle<int> area, const Target& target, GLint textureIndex) const
         {
             maskTexture.set (textureIndex);
             maskBounds.set (area.getX() - target.bounds.getX(),
@@ -262,12 +470,6 @@ public:
                           "void main() { gl_FragColor = frontColour; }")
         {}
     };
-
-   #if JUCE_ANDROID
-    #define JUCE_DECLARE_SWIZZLE_FUNCTION "\n" JUCE_MEDIUMP " vec4 swizzleRGBOrder (in " JUCE_MEDIUMP " vec4 c) { return vec4 (c.b, c.g, c.r, c.a); }\n"
-   #else
-    #define JUCE_DECLARE_SWIZZLE_FUNCTION "\n" JUCE_MEDIUMP " vec4 swizzleRGBOrder (in " JUCE_MEDIUMP " vec4 c) { return c; }\n"
-   #endif
 
     #define JUCE_DECLARE_MASK_UNIFORMS  "uniform sampler2D maskTexture;" \
                                         "uniform ivec4 maskBounds;"
@@ -297,11 +499,11 @@ public:
               matrix (program, "matrix")
         {}
 
-        void setMatrix (const Point<float> p1, const Point<float> p2, const Point<float> p3)
+        void setMatrix (Point<float> p1, Point<float> p2, Point<float> p3)
         {
-            const AffineTransform t (AffineTransform::fromTargetPoints (p1.x, p1.y,  0.0f, 0.0f,
-                                                                        p2.x, p2.y,  1.0f, 0.0f,
-                                                                        p3.x, p3.y,  0.0f, 1.0f));
+            auto t = AffineTransform::fromTargetPoints (p1, Point<float>(),
+                                                        p2, Point<float> (1.0f, 0.0f),
+                                                        p3, Point<float> (0.0f, 1.0f));
             const GLfloat m[] = { t.mat00, t.mat01, t.mat02, t.mat10, t.mat11, t.mat12 };
             matrix.set (m, 6);
         }
@@ -313,13 +515,13 @@ public:
     #define JUCE_DECLARE_RADIAL_UNIFORMS  "uniform sampler2D gradientTexture;" JUCE_DECLARE_MATRIX_UNIFORM
     #define JUCE_MATRIX_TIMES_FRAGCOORD   "(mat2 (matrix[0], matrix[3], matrix[1], matrix[4]) * pixelPos" \
                                           " + vec2 (matrix[2], matrix[5]))"
-    #define JUCE_GET_TEXTURE_COLOUR       "(frontColour.a * swizzleRGBOrder (texture2D (gradientTexture, vec2 (gradientPos, 0.5))))"
+    #define JUCE_GET_TEXTURE_COLOUR       "(frontColour.a * texture2D (gradientTexture, vec2 (gradientPos, 0.5)))"
 
     struct RadialGradientProgram  : public ShaderBase
     {
         RadialGradientProgram (OpenGLContext& context)
             : ShaderBase (context, JUCE_DECLARE_VARYING_PIXELPOS
-                          JUCE_DECLARE_RADIAL_UNIFORMS JUCE_DECLARE_VARYING_COLOUR JUCE_DECLARE_SWIZZLE_FUNCTION
+                          JUCE_DECLARE_RADIAL_UNIFORMS JUCE_DECLARE_VARYING_COLOUR
                           "void main()"
                           "{"
                             JUCE_MEDIUMP " float gradientPos = length (" JUCE_MATRIX_TIMES_FRAGCOORD ");"
@@ -336,7 +538,7 @@ public:
         RadialGradientMaskedProgram (OpenGLContext& context)
             : ShaderBase (context, JUCE_DECLARE_VARYING_PIXELPOS
                           JUCE_DECLARE_RADIAL_UNIFORMS JUCE_DECLARE_VARYING_COLOUR
-                          JUCE_DECLARE_MASK_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+                          JUCE_DECLARE_MASK_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_MEDIUMP " float gradientPos = length (" JUCE_MATRIX_TIMES_FRAGCOORD ");"
@@ -371,7 +573,6 @@ public:
     {
         LinearGradient1Program (OpenGLContext& context)
             : ShaderBase (context, JUCE_DECLARE_LINEAR_UNIFORMS  // gradientInfo: x = x1, y = y1, z = (y2 - y1) / (x2 - x1), w = length
-                          JUCE_DECLARE_SWIZZLE_FUNCTION
                           "void main()"
                           "{"
                             JUCE_CALC_LINEAR_GRAD_POS1
@@ -387,7 +588,7 @@ public:
     {
         LinearGradient1MaskedProgram (OpenGLContext& context)
             : ShaderBase (context, JUCE_DECLARE_LINEAR_UNIFORMS  // gradientInfo: x = x1, y = y1, z = (y2 - y1) / (x2 - x1), w = length
-                          JUCE_DECLARE_MASK_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+                          JUCE_DECLARE_MASK_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_CALC_LINEAR_GRAD_POS1
@@ -405,7 +606,6 @@ public:
     {
         LinearGradient2Program (OpenGLContext& context)
             : ShaderBase (context, JUCE_DECLARE_LINEAR_UNIFORMS  // gradientInfo: x = x1, y = y1, z = (x2 - x1) / (y2 - y1), y = y1, w = length
-                          JUCE_DECLARE_SWIZZLE_FUNCTION
                           "void main()"
                           "{"
                             JUCE_CALC_LINEAR_GRAD_POS2
@@ -421,7 +621,7 @@ public:
     {
         LinearGradient2MaskedProgram (OpenGLContext& context)
             : ShaderBase (context, JUCE_DECLARE_LINEAR_UNIFORMS  // gradientInfo: x = x1, y = y1, z = (x2 - x1) / (y2 - y1), y = y1, w = length
-                          JUCE_DECLARE_MASK_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+                          JUCE_DECLARE_MASK_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_CALC_LINEAR_GRAD_POS2
@@ -444,35 +644,32 @@ public:
               imageLimits (program, "imageLimits")
         {}
 
-        void setMatrix (const AffineTransform& trans,
-                        const int imageWidth, const int imageHeight,
+        void setMatrix (const AffineTransform& trans, int imageWidth, int imageHeight,
                         float fullWidthProportion, float fullHeightProportion,
-                        const float targetX, const float targetY,
-                        const bool isForTiling) const
+                        float targetX, float targetY, bool isForTiling) const
         {
-            const AffineTransform t (trans.translated (-targetX, -targetY)
-                                        .inverted().scaled (fullWidthProportion / imageWidth,
-                                                            fullHeightProportion / imageHeight));
+            auto t = trans.translated (-targetX, -targetY)
+                          .inverted().scaled (fullWidthProportion  / (float) imageWidth,
+                                              fullHeightProportion / (float) imageHeight);
 
             const GLfloat m[] = { t.mat00, t.mat01, t.mat02, t.mat10, t.mat11, t.mat12 };
             matrix.set (m, 6);
 
             if (isForTiling)
             {
-                fullWidthProportion -= 0.5f / imageWidth;
-                fullHeightProportion -= 0.5f / imageHeight;
+                fullWidthProportion  -= 0.5f / (float) imageWidth;
+                fullHeightProportion -= 0.5f / (float) imageHeight;
             }
 
             imageLimits.set (fullWidthProportion, fullHeightProportion);
         }
 
-        void setMatrix (const AffineTransform& trans, const OpenGLTextureFromImage& im,
-                        const float targetX, const float targetY,
-                        bool isForTiling) const
+        void setMatrix (const AffineTransform& trans, const TextureInfo& textureInfo,
+                        float targetX, float targetY, bool isForTiling) const
         {
             setMatrix (trans,
-                       im.imageWidth, im.imageHeight,
-                       im.fullWidthProportion, im.fullHeightProportion,
+                       textureInfo.imageWidth, textureInfo.imageHeight,
+                       textureInfo.fullWidthProportion, textureInfo.fullHeightProportion,
                        targetX, targetY, isForTiling);
         }
 
@@ -482,18 +679,35 @@ public:
     #define JUCE_DECLARE_IMAGE_UNIFORMS "uniform sampler2D imageTexture;" \
                                         "uniform " JUCE_MEDIUMP " vec2 imageLimits;" \
                                         JUCE_DECLARE_MATRIX_UNIFORM JUCE_DECLARE_VARYING_COLOUR JUCE_DECLARE_VARYING_PIXELPOS
-    #define JUCE_GET_IMAGE_PIXEL        "swizzleRGBOrder (texture2D (imageTexture, vec2 (texturePos.x, 1.0 - texturePos.y)))"
+    #define JUCE_GET_IMAGE_PIXEL        "texture2D (imageTexture, vec2 (texturePos.x, 1.0 - texturePos.y))"
     #define JUCE_CLAMP_TEXTURE_COORD    JUCE_HIGHP " vec2 texturePos = clamp (" JUCE_MATRIX_TIMES_FRAGCOORD ", vec2 (0, 0), imageLimits);"
     #define JUCE_MOD_TEXTURE_COORD      JUCE_HIGHP " vec2 texturePos = mod (" JUCE_MATRIX_TIMES_FRAGCOORD ", imageLimits);"
 
     struct ImageProgram  : public ShaderBase
     {
         ImageProgram (OpenGLContext& context)
-            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+            : ShaderBase (context, JUCE_DECLARE_VARYING_COLOUR
+                          "uniform sampler2D imageTexture;"
+                          "varying " JUCE_HIGHP " vec2 texturePos;"
                           "void main()"
                           "{"
-                            JUCE_CLAMP_TEXTURE_COORD
                             "gl_FragColor = frontColour.a * " JUCE_GET_IMAGE_PIXEL ";"
+                          "}",
+                          "uniform " JUCE_MEDIUMP " vec2 imageLimits;"
+                          JUCE_DECLARE_MATRIX_UNIFORM
+                          "attribute vec2 position;"
+                          "attribute vec4 colour;"
+                          "uniform vec4 screenBounds;"
+                          "varying " JUCE_MEDIUMP " vec4 frontColour;"
+                          "varying " JUCE_HIGHP " vec2 texturePos;"
+                          "void main()"
+                          "{"
+                            "frontColour = colour;"
+                            "vec2 adjustedPos = position - screenBounds.xy;"
+                            "vec2 pixelPos = adjustedPos;"
+                            "texturePos = clamp (" JUCE_MATRIX_TIMES_FRAGCOORD ", vec2 (0, 0), imageLimits);"
+                            "vec2 scaledPos = adjustedPos / screenBounds.zw;"
+                            "gl_Position = vec4 (scaledPos.x - 1.0, 1.0 - scaledPos.y, 0, 1.0);"
                           "}"),
               imageParams (program)
         {}
@@ -504,7 +718,7 @@ public:
     struct ImageMaskedProgram  : public ShaderBase
     {
         ImageMaskedProgram (OpenGLContext& context)
-            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_MASK_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_MASK_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_CLAMP_TEXTURE_COORD
@@ -521,7 +735,7 @@ public:
     struct TiledImageProgram  : public ShaderBase
     {
         TiledImageProgram (OpenGLContext& context)
-            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_MOD_TEXTURE_COORD
@@ -536,7 +750,7 @@ public:
     struct TiledImageMaskedProgram  : public ShaderBase
     {
         TiledImageMaskedProgram (OpenGLContext& context)
-            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_MASK_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_MASK_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_MOD_TEXTURE_COORD
@@ -553,7 +767,7 @@ public:
     struct CopyTextureProgram  : public ShaderBase
     {
         CopyTextureProgram (OpenGLContext& context)
-            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_MOD_TEXTURE_COORD
@@ -568,7 +782,7 @@ public:
     struct MaskTextureProgram  : public ShaderBase
     {
         MaskTextureProgram (OpenGLContext& context)
-            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS JUCE_DECLARE_SWIZZLE_FUNCTION
+            : ShaderBase (context, JUCE_DECLARE_IMAGE_UNIFORMS
                           "void main()"
                           "{"
                             JUCE_HIGHP " vec2 texturePos = " JUCE_MATRIX_TIMES_FRAGCOORD ";"
@@ -604,13 +818,119 @@ public:
 };
 
 //==============================================================================
+struct TraitsVAO
+{
+    static bool isCoreProfile()
+    {
+       #if JUCE_OPENGL_ES
+        return true;
+       #else
+        clearGLError();
+        GLint mask = 0;
+        glGetIntegerv (GL_CONTEXT_PROFILE_MASK, &mask);
+
+        // The context isn't aware of the profile mask, so it pre-dates the core profile
+        if (glGetError() == GL_INVALID_ENUM)
+            return false;
+
+        // Also assumes a compatibility profile if the mask is completely empty for some reason
+        return (mask & (GLint) GL_CONTEXT_CORE_PROFILE_BIT) != 0;
+       #endif
+    }
+
+    /*  Returns true if the context requires a non-zero vertex array object (VAO) to be bound.
+
+        If the context is a compatibility context, we can just pretend that VAOs don't exist,
+        and use the default VAO all the time instead. This provides a more consistent experience
+        in user code, which might make calls (like glVertexPointer()) that only work when VAO 0 is
+        bound in OpenGL 3.2+.
+    */
+    static bool shouldUseCustomVAO()
+    {
+       #if JUCE_OPENGL_ES
+        return false;
+       #else
+        return isCoreProfile();
+       #endif
+    }
+
+    static constexpr auto value = GL_VERTEX_ARRAY_BINDING;
+    static constexpr auto& gen = glGenVertexArrays;
+    static constexpr auto& del = glDeleteVertexArrays;
+    template <typename T>
+    static void bind (T x) { gl::glBindVertexArray (static_cast<GLuint> (x)); }
+    static constexpr auto predicate = shouldUseCustomVAO;
+};
+
+struct TraitsArrayBuffer
+{
+    static constexpr auto value = GL_ARRAY_BUFFER_BINDING;
+    static constexpr auto& gen = glGenBuffers;
+    static constexpr auto& del = glDeleteBuffers;
+    template <typename T>
+    static void bind (T x) { gl::glBindBuffer (GL_ARRAY_BUFFER, static_cast<GLuint> (x)); }
+    static bool predicate() { return true; }
+};
+
+struct TraitsElementArrayBuffer
+{
+    static constexpr auto value = GL_ELEMENT_ARRAY_BUFFER_BINDING;
+    static constexpr auto& gen = glGenBuffers;
+    static constexpr auto& del = glDeleteBuffers;
+    template <typename T>
+    static void bind (T x) { gl::glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, static_cast<GLuint> (x)); }
+    static bool predicate() { return true; }
+};
+
+template <typename Traits>
+class SavedBinding
+{
+public:
+    SavedBinding() = default;
+
+    ~SavedBinding()
+    {
+        if (! Traits::predicate())
+            return;
+
+        Traits::bind (values.previous);
+        Traits::del (1, &values.current);
+    }
+
+    void bind() const { Traits::bind (values.current); }
+
+    JUCE_DECLARE_NON_COPYABLE (SavedBinding)
+    JUCE_DECLARE_NON_MOVEABLE (SavedBinding)
+
+private:
+    struct Values
+    {
+        GLint previous{};
+        GLuint current{};
+    };
+
+    Values values = []
+    {
+        if (! Traits::predicate())
+            return Values{};
+
+        GLint previous{};
+        glGetIntegerv (Traits::value, &previous);
+
+        GLuint current{};
+        Traits::gen (1, &current);
+        Traits::bind (current);
+
+        return Values { previous, current };
+    }();
+};
+
+//==============================================================================
 struct StateHelpers
 {
     struct BlendingMode
     {
-        BlendingMode() noexcept
-            : blendingEnabled (false), srcFunction (0), dstFunction (0)
-        {}
+        BlendingMode() noexcept {}
 
         void resync() noexcept
         {
@@ -618,13 +938,13 @@ struct StateHelpers
             srcFunction = dstFunction = 0;
         }
 
-        template <class QuadQueueType>
+        template <typename QuadQueueType>
         void setPremultipliedBlendingMode (QuadQueueType& quadQueue) noexcept
         {
             setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
 
-        template <class QuadQueueType>
+        template <typename QuadQueueType>
         void setBlendFunc (QuadQueueType& quadQueue, GLenum src, GLenum dst)
         {
             if (! blendingEnabled)
@@ -643,7 +963,7 @@ struct StateHelpers
             }
         }
 
-        template <class QuadQueueType>
+        template <typename QuadQueueType>
         void disableBlend (QuadQueueType& quadQueue) noexcept
         {
             if (blendingEnabled)
@@ -654,8 +974,8 @@ struct StateHelpers
             }
         }
 
-        template <class QuadQueueType>
-        void setBlendMode (QuadQueueType& quadQueue, const bool replaceExistingContents) noexcept
+        template <typename QuadQueueType>
+        void setBlendMode (QuadQueueType& quadQueue, bool replaceExistingContents) noexcept
         {
             if (replaceExistingContents)
                 disableBlend (quadQueue);
@@ -664,45 +984,57 @@ struct StateHelpers
         }
 
     private:
-        bool blendingEnabled;
-        GLenum srcFunction, dstFunction;
+        bool blendingEnabled = false;
+        GLenum srcFunction = 0, dstFunction = 0;
     };
 
     //==============================================================================
-    template <class QuadQueueType>
+    template <typename QuadQueueType>
     struct EdgeTableRenderer
     {
-        EdgeTableRenderer (QuadQueueType& q, const PixelARGB c) noexcept
+        EdgeTableRenderer (QuadQueueType& q, PixelARGB c) noexcept
             : quadQueue (q), colour (c)
         {}
 
-        void setEdgeTableYPos (const int y) noexcept
+        void setEdgeTableYPos (int y) noexcept
         {
             currentY = y;
         }
 
-        void handleEdgeTablePixel (const int x, const int alphaLevel) noexcept
+        void handleEdgeTablePixel (int x, int alphaLevel) noexcept
         {
-            PixelARGB c (colour);
+            auto c = colour;
             c.multiplyAlpha (alphaLevel);
             quadQueue.add (x, currentY, 1, 1, c);
         }
 
-        void handleEdgeTablePixelFull (const int x) noexcept
+        void handleEdgeTablePixelFull (int x) noexcept
         {
             quadQueue.add (x, currentY, 1, 1, colour);
         }
 
-        void handleEdgeTableLine (const int x, const int width, const int alphaLevel) noexcept
+        void handleEdgeTableLine (int x, int width, int alphaLevel) noexcept
         {
-            PixelARGB c (colour);
+            auto c = colour;
             c.multiplyAlpha (alphaLevel);
             quadQueue.add (x, currentY, width, 1, c);
         }
 
-        void handleEdgeTableLineFull (const int x, const int width) noexcept
+        void handleEdgeTableLineFull (int x, int width) noexcept
         {
             quadQueue.add (x, currentY, width, 1, colour);
+        }
+
+        void handleEdgeTableRectangle (int x, int y, int width, int height, int alphaLevel) noexcept
+        {
+            auto c = colour;
+            c.multiplyAlpha (alphaLevel);
+            quadQueue.add (x, y, width, height, c);
+        }
+
+        void handleEdgeTableRectangleFull (int x, int y, int width, int height) noexcept
+        {
+            quadQueue.add (x, y, width, height, colour);
         }
 
     private:
@@ -713,14 +1045,14 @@ struct StateHelpers
         JUCE_DECLARE_NON_COPYABLE (EdgeTableRenderer)
     };
 
-    template <class QuadQueueType>
+    template <typename QuadQueueType>
     struct FloatRectangleRenderer
     {
-        FloatRectangleRenderer (QuadQueueType& q, const PixelARGB c) noexcept
+        FloatRectangleRenderer (QuadQueueType& q, PixelARGB c) noexcept
             : quadQueue (q), colour (c)
         {}
 
-        void operator() (const int x, const int y, const int w, const int h, const int alpha) noexcept
+        void operator() (int x, int y, int w, int h, int alpha) noexcept
         {
             if (w > 0 && h > 0)
             {
@@ -740,39 +1072,45 @@ struct StateHelpers
     //==============================================================================
     struct ActiveTextures
     {
-        ActiveTextures (const OpenGLContext& c) noexcept
-            : texturesEnabled (0), currentActiveTexture (-1), context (c)
-        {}
+        explicit ActiveTextures (const OpenGLContext& c) noexcept
+            : context (c)
+        {
+        }
 
         void clear() noexcept
         {
             zeromem (currentTextureID, sizeof (currentTextureID));
         }
 
-        template <class QuadQueueType>
-        void setTexturesEnabled (QuadQueueType& quadQueue, const int textureIndexMask) noexcept
+        template <typename QuadQueueType>
+        void setTexturesEnabled (QuadQueueType& quadQueue, int textureIndexMask) noexcept
         {
             if (texturesEnabled != textureIndexMask)
             {
                 quadQueue.flush();
 
-                for (int i = 3; --i >= 0;)
+                for (int i = numTextures; --i >= 0;)
                 {
                     if ((texturesEnabled & (1 << i)) != (textureIndexMask & (1 << i)))
                     {
                         setActiveTexture (i);
                         JUCE_CHECK_OPENGL_ERROR
 
-                       #if ! JUCE_ANDROID
-                        if ((textureIndexMask & (1 << i)) != 0)
-                            glEnable (GL_TEXTURE_2D);
-                        else
-                        {
-                            glDisable (GL_TEXTURE_2D);
-                            currentTextureID[i] = 0;
-                        }
+                        const auto thisTextureEnabled = (textureIndexMask & (1 << i)) != 0;
 
-                        clearGLError();
+                        if (! thisTextureEnabled)
+                            currentTextureID[i] = 0;
+
+                       #if ! JUCE_ANDROID
+                        if (needsToEnableTexture)
+                        {
+                            if (thisTextureEnabled)
+                                glEnable (GL_TEXTURE_2D);
+                            else
+                                glDisable (GL_TEXTURE_2D);
+
+                            JUCE_CHECK_OPENGL_ERROR
+                        }
                        #endif
                     }
                 }
@@ -781,20 +1119,20 @@ struct StateHelpers
             }
         }
 
-        template <class QuadQueueType>
+        template <typename QuadQueueType>
         void disableTextures (QuadQueueType& quadQueue) noexcept
         {
             setTexturesEnabled (quadQueue, 0);
         }
 
-        template <class QuadQueueType>
+        template <typename QuadQueueType>
         void setSingleTextureMode (QuadQueueType& quadQueue) noexcept
         {
             setTexturesEnabled (quadQueue, 1);
             setActiveTexture (0);
         }
 
-        template <class QuadQueueType>
+        template <typename QuadQueueType>
         void setTwoTextureMode (QuadQueueType& quadQueue, GLuint texture1, GLuint texture2)
         {
             JUCE_CHECK_OPENGL_ERROR
@@ -813,26 +1151,31 @@ struct StateHelpers
                 setActiveTexture (0);
                 bindTexture (texture1);
             }
+
             JUCE_CHECK_OPENGL_ERROR
         }
 
-        void setActiveTexture (const int index) noexcept
+        void setActiveTexture (int index) noexcept
         {
             if (currentActiveTexture != index)
             {
                 currentActiveTexture = index;
-                context.extensions.glActiveTexture ((GLenum) (GL_TEXTURE0 + index));
+                context.extensions.glActiveTexture (GL_TEXTURE0 + (GLenum) index);
                 JUCE_CHECK_OPENGL_ERROR
             }
         }
 
-        void bindTexture (const GLuint textureID) noexcept
+        void bindTexture (GLuint textureID) noexcept
         {
-            jassert (currentActiveTexture >= 0);
-
-            if (currentTextureID [currentActiveTexture] != textureID)
+            if (currentActiveTexture < 0 || numTextures <= currentActiveTexture)
             {
-                currentTextureID [currentActiveTexture] = textureID;
+                jassertfalse;
+                return;
+            }
+
+            if (currentTextureID[currentActiveTexture] != textureID)
+            {
+                currentTextureID[currentActiveTexture] = textureID;
                 glBindTexture (GL_TEXTURE_2D, textureID);
                 JUCE_CHECK_OPENGL_ERROR
             }
@@ -847,9 +1190,11 @@ struct StateHelpers
         }
 
     private:
-        GLuint currentTextureID [3];
-        int texturesEnabled, currentActiveTexture;
+        static constexpr auto numTextures = 3;
+        GLuint currentTextureID[numTextures];
+        int texturesEnabled = 0, currentActiveTexture = -1;
         const OpenGLContext& context;
+        const bool needsToEnableTexture = ! context.isCoreProfile();
 
         ActiveTextures& operator= (const ActiveTextures&);
     };
@@ -857,9 +1202,7 @@ struct StateHelpers
     //==============================================================================
     struct TextureCache
     {
-        TextureCache() noexcept
-            : activeGradientIndex (0), gradientNeedsRefresh (true)
-        {}
+        TextureCache() noexcept {}
 
         OpenGLTexture* getTexture (ActiveTextures& activeTextures, int w, int h)
         {
@@ -871,7 +1214,8 @@ struct StateHelpers
 
             for (int i = 0; i < numTexturesToCache - 2; ++i)
             {
-                const OpenGLTexture* const t = textures.getUnchecked(i);
+                auto* t = textures.getUnchecked(i);
+
                 if (t->getWidth() == w && t->getHeight() == h)
                     return textures.removeAndReturn (i);
             }
@@ -902,8 +1246,8 @@ struct StateHelpers
                 }
 
                 JUCE_CHECK_OPENGL_ERROR;
-                PixelARGB lookup [gradientTextureSize];
-                gradient.createLookupTable (lookup, gradientTextureSize);
+                PixelARGB lookup[gradientTextureSize];
+                gradient.createLookupTable (lookup);
                 gradientTextures.getUnchecked (activeGradientIndex)->loadARGB (lookup, gradientTextureSize, 1);
             }
 
@@ -915,28 +1259,34 @@ struct StateHelpers
     private:
         enum { numTexturesToCache = 8, numGradientTexturesToCache = 10 };
         OwnedArray<OpenGLTexture> textures, gradientTextures;
-        int activeGradientIndex;
-        bool gradientNeedsRefresh;
+        int activeGradientIndex = 0;
+        bool gradientNeedsRefresh = true;
     };
 
     //==============================================================================
     struct ShaderQuadQueue
     {
-        ShaderQuadQueue (const OpenGLContext& c) noexcept
-            : context (c), numVertices (0)
+        ShaderQuadQueue (const OpenGLContext& c) noexcept  : context (c)
         {}
 
         ~ShaderQuadQueue() noexcept
         {
-            static_jassert (sizeof (VertexInfo) == 8);
-            context.extensions.glBindBuffer (GL_ARRAY_BUFFER, 0);
-            context.extensions.glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
-            context.extensions.glDeleteBuffers (2, buffers);
+            static_assert (sizeof (VertexInfo) == 8, "Sanity check VertexInfo size");
         }
 
         void initialise() noexcept
         {
             JUCE_CHECK_OPENGL_ERROR
+
+           #if JUCE_ANDROID || JUCE_IOS
+            int numQuads = maxNumQuads;
+           #else
+            GLint maxIndices = 0;
+            glGetIntegerv (GL_MAX_ELEMENTS_INDICES, &maxIndices);
+            auto numQuads = jmin ((int) maxNumQuads, (int) maxIndices / 6);
+            maxVertices = numQuads * 4 - 4;
+           #endif
+
             for (int i = 0, v = 0; i < numQuads * 6; i += 6, v += 4)
             {
                 indexData[i] = (GLushort) v;
@@ -945,25 +1295,32 @@ struct StateHelpers
                 indexData[i + 5] = (GLushort) (v + 3);
             }
 
-            context.extensions.glGenBuffers (2, buffers);
-            context.extensions.glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, buffers[0]);
+            savedElementArrayBuffer.bind();
             context.extensions.glBufferData (GL_ELEMENT_ARRAY_BUFFER, sizeof (indexData), indexData, GL_STATIC_DRAW);
-            context.extensions.glBindBuffer (GL_ARRAY_BUFFER, buffers[1]);
+
+            savedArrayBuffer.bind();
             context.extensions.glBufferData (GL_ARRAY_BUFFER, sizeof (vertexData), vertexData, GL_STREAM_DRAW);
             JUCE_CHECK_OPENGL_ERROR
         }
 
-        void add (const int x, const int y, const int w, const int h, const PixelARGB colour) noexcept
+        void add (int x, int y, int w, int h, PixelARGB colour) noexcept
         {
             jassert (w > 0 && h > 0);
 
-            VertexInfo* const v = vertexData + numVertices;
+            auto* v = vertexData + numVertices;
             v[0].x = v[2].x = (GLshort) x;
             v[0].y = v[1].y = (GLshort) y;
             v[1].x = v[3].x = (GLshort) (x + w);
             v[2].y = v[3].y = (GLshort) (y + h);
 
-            const GLuint rgba = colour.getInRGBAMemoryOrder();
+           #if JUCE_BIG_ENDIAN
+            auto rgba = (GLuint) ((colour.getRed() << 24) | (colour.getGreen() << 16)
+                                | (colour.getBlue() << 8) |  colour.getAlpha());
+           #else
+            auto rgba = (GLuint) ((colour.getAlpha() << 24) | (colour.getBlue() << 16)
+                                | (colour.getGreen() << 8) |  colour.getRed());
+           #endif
+
             v[0].colour = rgba;
             v[1].colour = rgba;
             v[2].colour = rgba;
@@ -971,40 +1328,40 @@ struct StateHelpers
 
             numVertices += 4;
 
-            if (numVertices > numQuads * 4 - 4)
+            if (numVertices > maxVertices)
                 draw();
         }
 
-        void add (const Rectangle<int>& r, const PixelARGB colour) noexcept
+        void add (Rectangle<int> r, PixelARGB colour) noexcept
         {
             add (r.getX(), r.getY(), r.getWidth(), r.getHeight(), colour);
         }
 
-        void add (const Rectangle<float>& r, const PixelARGB colour) noexcept
+        void add (Rectangle<float> r, PixelARGB colour) noexcept
         {
             FloatRectangleRenderer<ShaderQuadQueue> frr (*this, colour);
             RenderingHelpers::FloatRectangleRasterisingInfo (r).iterate (frr);
         }
 
-        void add (const RectangleList<int>& list, const PixelARGB colour) noexcept
+        void add (const RectangleList<int>& list, PixelARGB colour) noexcept
         {
-            for (const Rectangle<int>* i = list.begin(), * const e = list.end(); i != e; ++i)
-                add (*i, colour);
+            for (auto& i : list)
+                add (i, colour);
         }
 
-        void add (const RectangleList<int>& list, const Rectangle<int>& clip, const PixelARGB colour) noexcept
+        void add (const RectangleList<int>& list, Rectangle<int> clip, PixelARGB colour) noexcept
         {
-            for (const Rectangle<int>* i = list.begin(), * const e = list.end(); i != e; ++i)
+            for (auto& i : list)
             {
-                const Rectangle<int> r (i->getIntersection (clip));
+                auto r = i.getIntersection (clip);
 
                 if (! r.isEmpty())
                     add (r, colour);
             }
         }
 
-        template <class IteratorType>
-        void add (const IteratorType& et, const PixelARGB colour)
+        template <typename IteratorType>
+        void add (const IteratorType& et, PixelARGB colour)
         {
             EdgeTableRenderer<ShaderQuadQueue> etr (*this, colour);
             et.iterate (etr);
@@ -1023,24 +1380,27 @@ struct StateHelpers
             GLuint colour;
         };
 
-       #if JUCE_MAC || JUCE_ANDROID || JUCE_IOS
-        enum { numQuads = 256 };
-       #else
-        enum { numQuads = 64 }; // (had problems with my drivers segfaulting when these buffers are any larger)
-       #endif
+        enum { maxNumQuads = 256 };
 
-        GLuint buffers[2];
-        VertexInfo vertexData [numQuads * 4];
-        GLushort indexData [numQuads * 6];
+        SavedBinding<TraitsArrayBuffer> savedArrayBuffer;
+        SavedBinding<TraitsElementArrayBuffer> savedElementArrayBuffer;
+        VertexInfo vertexData[maxNumQuads * 4];
+        GLushort indexData[maxNumQuads * 6];
         const OpenGLContext& context;
-        int numVertices;
+        int numVertices = 0;
+
+       #if JUCE_ANDROID || JUCE_IOS
+        enum { maxVertices = maxNumQuads * 4 - 4 };
+       #else
+        int maxVertices = 0;
+       #endif
 
         void draw() noexcept
         {
             context.extensions.glBufferSubData (GL_ARRAY_BUFFER, 0, (GLsizeiptr) ((size_t) numVertices * sizeof (VertexInfo)), vertexData);
             // NB: If you get a random crash in here and are running in a Parallels VM, it seems to be a bug in
             // their driver.. Can't find a workaround unfortunately.
-            glDrawElements (GL_TRIANGLES, (numVertices * 3) / 2, GL_UNSIGNED_SHORT, 0);
+            glDrawElements (GL_TRIANGLES, (numVertices * 3) / 2, GL_UNSIGNED_SHORT, nullptr);
             JUCE_CHECK_OPENGL_ERROR
             numVertices = 0;
         }
@@ -1051,27 +1411,35 @@ struct StateHelpers
     //==============================================================================
     struct CurrentShader
     {
-        CurrentShader (OpenGLContext& c) noexcept
-            : context (c), activeShader (nullptr)
+        CurrentShader (OpenGLContext& c) noexcept  : context (c)
         {
-            const char programValueID[] = "GraphicsContextPrograms";
-            programs = static_cast <ShaderPrograms*> (context.getAssociatedObject (programValueID));
+            auto programValueID = "GraphicsContextPrograms";
+            programs = static_cast<ShaderPrograms*> (context.getAssociatedObject (programValueID));
 
             if (programs == nullptr)
             {
                 programs = new ShaderPrograms (context);
-                context.setAssociatedObject (programValueID, programs);
+                context.setAssociatedObject (programValueID, programs.get());
             }
         }
 
-        void setShader (const Rectangle<int>& bounds, ShaderQuadQueue& quadQueue, ShaderPrograms::ShaderBase& shader)
+        ~CurrentShader()
+        {
+            jassert (activeShader == nullptr);
+        }
+
+        void setShader (Rectangle<int> bounds, ShaderQuadQueue& quadQueue, ShaderPrograms::ShaderBase& shader)
         {
             if (activeShader != &shader)
             {
-                quadQueue.flush();
+                clearShader (quadQueue);
+
                 activeShader = &shader;
                 shader.program.use();
-                shader.bindAttributes (context);
+                shader.bindAttributes();
+
+                if (shader.onShaderActivated)
+                    shader.onShaderActivated (shader.program);
 
                 currentBounds = bounds;
                 shader.set2DBounds (bounds.toFloat());
@@ -1095,7 +1463,7 @@ struct StateHelpers
             if (activeShader != nullptr)
             {
                 quadQueue.flush();
-                activeShader->unbindAttributes (context);
+                activeShader->unbindAttributes();
                 activeShader = nullptr;
                 context.extensions.glUseProgram (0);
             }
@@ -1105,7 +1473,7 @@ struct StateHelpers
         ShaderPrograms::Ptr programs;
 
     private:
-        ShaderPrograms::ShaderBase* activeShader;
+        ShaderPrograms::ShaderBase* activeShader = nullptr;
         Rectangle<int> currentBounds;
 
         CurrentShader& operator= (const CurrentShader&);
@@ -1113,9 +1481,8 @@ struct StateHelpers
 };
 
 //==============================================================================
-class GLState
+struct GLState
 {
-public:
     GLState (const Target& t) noexcept
         : target (t),
           activeTextures (t.context),
@@ -1132,6 +1499,7 @@ public:
         JUCE_CHECK_OPENGL_ERROR
         activeTextures.clear();
         shaderQuadQueue.initialise();
+        cachedImageList = CachedImageList::get (t.context);
         JUCE_CHECK_OPENGL_ERROR
     }
 
@@ -1155,7 +1523,7 @@ public:
     }
 
     void setShaderForGradientFill (const ColourGradient& g, const AffineTransform& transform,
-                                   const int maskTextureID, const Rectangle<int>* const maskArea)
+                                   int maskTextureID, const Rectangle<int>* maskArea)
     {
         JUCE_CHECK_OPENGL_ERROR
         activeTextures.disableTextures (shaderQuadQueue);
@@ -1176,14 +1544,14 @@ public:
             textureCache.bindTextureForGradient (activeTextures, g);
         }
 
-        const AffineTransform t (transform.translated (0.5f - target.bounds.getX(),
-                                                       0.5f - target.bounds.getY()));
-        Point<float> p1 (g.point1.transformedBy (t));
-        const Point<float> p2 (g.point2.transformedBy (t));
-        const Point<float> p3 (Point<float> (g.point1.x + (g.point2.y - g.point1.y),
-                                             g.point1.y - (g.point2.x - g.point1.x)).transformedBy (t));
+        auto t = transform.translated (0.5f - (float) target.bounds.getX(),
+                                       0.5f - (float) target.bounds.getY());
+        auto p1 = g.point1.transformedBy (t);
+        auto p2 = g.point2.transformedBy (t);
+        auto p3 = Point<float> (g.point1.x + (g.point2.y - g.point1.y),
+                                g.point1.y - (g.point2.x - g.point1.x)).transformedBy (t);
 
-        ShaderPrograms* const programs = currentShader.programs;
+        auto programs = currentShader.programs;
         const ShaderPrograms::MaskedShaderParams* maskParams = nullptr;
 
         if (g.isRadial)
@@ -1255,19 +1623,19 @@ public:
         JUCE_CHECK_OPENGL_ERROR
     }
 
-    void setShaderForTiledImageFill (const OpenGLTextureFromImage& image, const AffineTransform& transform,
-                                     const int maskTextureID, const Rectangle<int>* const maskArea, bool isTiledFill)
+    void setShaderForTiledImageFill (const TextureInfo& textureInfo, const AffineTransform& transform,
+                                     int maskTextureID, const Rectangle<int>* maskArea, bool isTiledFill)
     {
         blendMode.setPremultipliedBlendingMode (shaderQuadQueue);
 
-        ShaderPrograms* const programs = currentShader.programs;
+        auto programs = currentShader.programs;
 
         const ShaderPrograms::MaskedShaderParams* maskParams = nullptr;
         const ShaderPrograms::ImageParams* imageParams;
 
         if (maskArea != nullptr)
         {
-            activeTextures.setTwoTextureMode (shaderQuadQueue, image.textureID, (GLuint) maskTextureID);
+            activeTextures.setTwoTextureMode (shaderQuadQueue, textureInfo.textureID, (GLuint) maskTextureID);
 
             if (isTiledFill)
             {
@@ -1285,7 +1653,7 @@ public:
         else
         {
             activeTextures.setSingleTextureMode (shaderQuadQueue);
-            activeTextures.bindTexture (image.textureID);
+            activeTextures.bindTexture (textureInfo.textureID);
 
             if (isTiledFill)
             {
@@ -1299,7 +1667,7 @@ public:
             }
         }
 
-        imageParams->setMatrix (transform, image, (float) target.bounds.getX(), (float) target.bounds.getY(), isTiledFill);
+        imageParams->setMatrix (transform, textureInfo, (float) target.bounds.getX(), (float) target.bounds.getY(), isTiledFill);
 
         if (maskParams != nullptr)
             maskParams->setBounds (*maskArea, target, 1);
@@ -1313,37 +1681,38 @@ public:
     StateHelpers::CurrentShader currentShader;
     StateHelpers::ShaderQuadQueue shaderQuadQueue;
 
+    CachedImageList::Ptr cachedImageList;
+
 private:
     GLuint previousFrameBufferTarget;
+    SavedBinding<TraitsVAO> savedVAOBinding;
 };
 
 //==============================================================================
-class SavedState  : public RenderingHelpers::SavedStateBase<SavedState>
+struct SavedState  : public RenderingHelpers::SavedStateBase<SavedState>
 {
-    typedef RenderingHelpers::SavedStateBase<SavedState> BaseClass;
+    using BaseClass = RenderingHelpers::SavedStateBase<SavedState>;
 
-public:
-    SavedState (GLState* const s)
-        : BaseClass (s->target.bounds), state (s)
+    SavedState (GLState* s)  : BaseClass (s->target.bounds), state (s)
     {}
 
     SavedState (const SavedState& other)
-        : BaseClass (other), font (other.font),
-          state (other.state), transparencyLayer (other.transparencyLayer),
-          previousTarget (other.previousTarget.createCopy())
+        : BaseClass (other), font (other.font), state (other.state),
+          transparencyLayer (other.transparencyLayer),
+          previousTarget (createCopyIfNotNull (other.previousTarget.get()))
     {}
 
     SavedState* beginTransparencyLayer (float opacity)
     {
-        SavedState* const s = new SavedState (*this);
+        auto* s = new SavedState (*this);
 
         if (clip != nullptr)
         {
-            const Rectangle<int> clipBounds (clip->getClipBounds());
+            auto clipBounds = clip->getClipBounds();
 
             state->flush();
             s->transparencyLayer = Image (OpenGLImageType().create (Image::ARGB, clipBounds.getWidth(), clipBounds.getHeight(), true));
-            s->previousTarget = new Target (state->target);
+            s->previousTarget.reset (new Target (state->target));
             state->target = Target (state->target.context, *OpenGLImageType::getFrameBufferFrom (s->transparencyLayer), clipBounds.getPosition());
             s->transparencyLayerAlpha = opacity;
             s->cloneClipIfMultiplyReferenced();
@@ -1362,10 +1731,10 @@ public:
 
             state->flush();
             state->target = *finishedLayerState.previousTarget;
-            finishedLayerState.previousTarget = nullptr;
+            finishedLayerState.previousTarget.reset();
 
             state->target.makeActive();
-            const Rectangle<int> clipBounds (clip->getClipBounds());
+            auto clipBounds = clip->getClipBounds();
 
             clip->renderImageUntransformed (*this, finishedLayerState.transparencyLayer,
                                             (int) (finishedLayerState.transparencyLayerAlpha * 255.0f),
@@ -1373,7 +1742,7 @@ public:
         }
     }
 
-    typedef RenderingHelpers::GlyphCache <RenderingHelpers::CachedGlyphEdgeTable <SavedState>, SavedState> GlyphCacheType;
+    using GlyphCacheType = RenderingHelpers::GlyphCache<RenderingHelpers::CachedGlyphEdgeTable<SavedState>, SavedState>;
 
     void drawGlyph (int glyphNumber, const AffineTransform& trans)
     {
@@ -1381,8 +1750,7 @@ public:
         {
             if (trans.isOnlyTranslation() && ! transform.isRotated)
             {
-                GlyphCacheType& cache = GlyphCacheType::getInstance();
-
+                auto& cache = GlyphCacheType::getInstance();
                 Point<float> pos (trans.getTranslationX(), trans.getTranslationY());
 
                 if (transform.isOnlyTranslated)
@@ -1396,7 +1764,8 @@ public:
                     Font f (font);
                     f.setHeight (font.getHeight() * transform.complexTransform.mat11);
 
-                    const float xScale = transform.complexTransform.mat00 / transform.complexTransform.mat11;
+                    auto xScale = transform.complexTransform.mat00 / transform.complexTransform.mat11;
+
                     if (std::abs (xScale - 1.0f) > 0.01f)
                         f.setHorizontalScale (xScale);
 
@@ -1405,15 +1774,15 @@ public:
             }
             else
             {
-                const float fontHeight = font.getHeight();
+                auto fontHeight = font.getHeight();
 
-                AffineTransform t (transform.getTransformWith (AffineTransform::scale (fontHeight * font.getHorizontalScale(), fontHeight)
-                                                                               .followedBy (trans)));
+                auto t = transform.getTransformWith (AffineTransform::scale (fontHeight * font.getHorizontalScale(), fontHeight)
+                                                                     .followedBy (trans));
 
-                const ScopedPointer<EdgeTable> et (font.getTypeface()->getEdgeTableForGlyph (glyphNumber, t));
+                const std::unique_ptr<EdgeTable> et (font.getTypefacePtr()->getEdgeTableForGlyph (glyphNumber, t, fontHeight));
 
                 if (et != nullptr)
-                    fillShape (new EdgeTableRegionType (*et), false);
+                    fillShape (*new EdgeTableRegionType (*et), false);
             }
         }
     }
@@ -1428,12 +1797,11 @@ public:
 
     //==============================================================================
     template <typename IteratorType>
-    void renderImageTransformed (IteratorType& iter, const Image& src, const int alpha,
+    void renderImageTransformed (IteratorType& iter, const Image& src, int alpha,
                                  const AffineTransform& trans, Graphics::ResamplingQuality, bool tiledFill) const
     {
         state->shaderQuadQueue.flush();
-        OpenGLTextureFromImage image (src);
-        state->setShaderForTiledImageFill (image, trans, 0, nullptr, tiledFill);
+        state->setShaderForTiledImageFill (state->cachedImageList->getTextureFor (src), trans, 0, nullptr, tiledFill);
 
         state->shaderQuadQueue.add (iter, PixelARGB ((uint8) alpha, (uint8) alpha, (uint8) alpha, (uint8) alpha));
         state->shaderQuadQueue.flush();
@@ -1442,18 +1810,22 @@ public:
     }
 
     template <typename IteratorType>
-    void renderImageUntransformed (IteratorType& iter, const Image& src, const int alpha, int x, int y, bool tiledFill) const
+    void renderImageUntransformed (IteratorType& iter, const Image& src, int alpha, int x, int y, bool tiledFill) const
     {
         renderImageTransformed (iter, src, alpha, AffineTransform::translation ((float) x, (float) y),
                                 Graphics::lowResamplingQuality, tiledFill);
     }
 
     template <typename IteratorType>
-    void fillWithSolidColour (IteratorType& iter, const PixelARGB colour, bool replaceContents) const
+    void fillWithSolidColour (IteratorType& iter, PixelARGB colour, bool replaceContents) const
     {
-        state->activeTextures.disableTextures (state->shaderQuadQueue);
-        state->blendMode.setBlendMode (state->shaderQuadQueue, replaceContents);
-        state->setShader (state->currentShader.programs->solidColourProgram);
+        if (! isUsingCustomShader)
+        {
+            state->activeTextures.disableTextures (state->shaderQuadQueue);
+            state->blendMode.setBlendMode (state->shaderQuadQueue, replaceContents);
+            state->setShader (state->currentShader.programs->solidColourProgram);
+        }
+
         state->shaderQuadQueue.add (iter, colour);
     }
 
@@ -1464,38 +1836,50 @@ public:
         state->shaderQuadQueue.add (iter, fillType.colour.getPixelARGB());
     }
 
+    void fillRectWithCustomShader (OpenGLRendering::ShaderPrograms::ShaderBase& shader, Rectangle<int> area)
+    {
+        state->setShader (shader);
+        isUsingCustomShader = true;
+
+        fillRect (area, true);
+
+        isUsingCustomShader = false;
+        state->currentShader.clearShader (state->shaderQuadQueue);
+    }
+
     //==============================================================================
     Font font;
     GLState* state;
+    bool isUsingCustomShader = false;
 
 private:
     Image transparencyLayer;
-    ScopedPointer<Target> previousTarget;
+    std::unique_ptr<Target> previousTarget;
 
     SavedState& operator= (const SavedState&);
 };
 
 
 //==============================================================================
-class ShaderContext   : public RenderingHelpers::StackBasedLowLevelGraphicsContext <SavedState>
+struct ShaderContext   : public RenderingHelpers::StackBasedLowLevelGraphicsContext<SavedState>
 {
-public:
     ShaderContext (const Target& target)  : glState (target)
     {
         stack.initialise (new SavedState (&glState));
     }
 
-private:
+    void fillRectWithCustomShader (ShaderPrograms::ShaderBase& shader, Rectangle<int> area)
+    {
+        static_cast<SavedState&> (*stack).fillRectWithCustomShader (shader, area);
+    }
+
     GLState glState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ShaderContext)
 };
 
-#endif
-
-class NonShaderContext   : public LowLevelGraphicsSoftwareRenderer
+struct NonShaderContext   : public LowLevelGraphicsSoftwareRenderer
 {
-public:
     NonShaderContext (const Target& t, const Image& im)
         : LowLevelGraphicsSoftwareRenderer (im), target (t), image (im)
     {}
@@ -1503,11 +1887,14 @@ public:
     ~NonShaderContext()
     {
         JUCE_CHECK_OPENGL_ERROR
-        const GLuint previousFrameBufferTarget = OpenGLFrameBuffer::getCurrentFrameBufferTarget();
+        auto previousFrameBufferTarget = OpenGLFrameBuffer::getCurrentFrameBufferTarget();
 
        #if ! JUCE_ANDROID
         target.context.extensions.glActiveTexture (GL_TEXTURE0);
-        glEnable (GL_TEXTURE_2D);
+
+        if (! target.context.isCoreProfile())
+            glEnable (GL_TEXTURE_2D);
+
         clearGLError();
        #endif
 
@@ -1537,39 +1924,131 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NonShaderContext)
 };
 
-LowLevelGraphicsContext* createOpenGLContext (const Target&);
-LowLevelGraphicsContext* createOpenGLContext (const Target& target)
+static void clearOpenGLGlyphCacheCallback()
 {
-   #if JUCE_USE_OPENGL_SHADERS
+    SavedState::GlyphCacheType::getInstance().reset();
+}
+
+static std::unique_ptr<LowLevelGraphicsContext> createOpenGLContext (const Target& target)
+{
+    clearOpenGLGlyphCache = clearOpenGLGlyphCacheCallback;
+
     if (target.context.areShadersAvailable())
-        return new ShaderContext (target);
-   #endif
+        return std::make_unique<ShaderContext> (target);
 
     Image tempImage (Image::ARGB, target.bounds.getWidth(), target.bounds.getHeight(), true, SoftwareImageType());
-    return new NonShaderContext (target, tempImage);
+    return std::make_unique<NonShaderContext> (target, tempImage);
 }
 
 }
 
 //==============================================================================
-LowLevelGraphicsContext* createOpenGLGraphicsContext (OpenGLContext& context, int width, int height)
+std::unique_ptr<LowLevelGraphicsContext> createOpenGLGraphicsContext (OpenGLContext& context, int width, int height)
 {
     return createOpenGLGraphicsContext (context, context.getFrameBufferID(), width, height);
 }
 
-LowLevelGraphicsContext* createOpenGLGraphicsContext (OpenGLContext& context, OpenGLFrameBuffer& target)
+std::unique_ptr<LowLevelGraphicsContext> createOpenGLGraphicsContext (OpenGLContext& context, OpenGLFrameBuffer& target)
 {
-    return OpenGLRendering::createOpenGLContext (OpenGLRendering::Target (context, target, Point<int>()));
+    return OpenGLRendering::createOpenGLContext (OpenGLRendering::Target (context, target, {}));
 }
 
-LowLevelGraphicsContext* createOpenGLGraphicsContext (OpenGLContext& context, unsigned int frameBufferID, int width, int height)
+std::unique_ptr<LowLevelGraphicsContext> createOpenGLGraphicsContext (OpenGLContext& context, unsigned int frameBufferID, int width, int height)
 {
-    using namespace OpenGLRendering;
     return OpenGLRendering::createOpenGLContext (OpenGLRendering::Target (context, frameBufferID, width, height));
 }
 
-void clearOpenGLGlyphCache();
-void clearOpenGLGlyphCache()
+//==============================================================================
+struct CustomProgram  : public ReferenceCountedObject,
+                        public OpenGLRendering::ShaderPrograms::ShaderBase
 {
-    OpenGLRendering::SavedState::GlyphCacheType::getInstance().reset();
+    CustomProgram (OpenGLRendering::ShaderContext& c, const String& fragmentShader)
+        : ShaderBase (c.glState.target.context, fragmentShader.toRawUTF8())
+    {
+    }
+
+    static ReferenceCountedObjectPtr<CustomProgram> get (const String& hashName)
+    {
+        if (auto* c = OpenGLContext::getCurrentContext())
+            if (auto* o = c->getAssociatedObject (hashName.toRawUTF8()))
+                return *static_cast<CustomProgram*> (o);
+
+        return {};
+    }
+
+    static ReferenceCountedObjectPtr<CustomProgram> getOrCreate (LowLevelGraphicsContext& gc, const String& hashName,
+                                                                 const String& code, String& errorMessage)
+    {
+        if (auto c = get (hashName))
+            return c;
+
+        if (auto* sc = dynamic_cast<OpenGLRendering::ShaderContext*> (&gc))
+        {
+            ReferenceCountedObjectPtr<CustomProgram> c (new CustomProgram (*sc, code));
+            errorMessage = c->lastError;
+
+            if (errorMessage.isEmpty())
+            {
+                if (auto context = OpenGLContext::getCurrentContext())
+                {
+                    context->setAssociatedObject (hashName.toRawUTF8(), c.get());
+                    return c;
+                }
+            }
+        }
+
+        return nullptr;
+    }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomProgram)
+};
+
+OpenGLGraphicsContextCustomShader::OpenGLGraphicsContextCustomShader (const String& fragmentShaderCode)
+    : code (String (JUCE_DECLARE_VARYING_COLOUR
+                    JUCE_DECLARE_VARYING_PIXELPOS
+                    "\n#define pixelAlpha frontColour.a\n") + fragmentShaderCode),
+      hashName (String::toHexString (fragmentShaderCode.hashCode64()) + "_shader")
+{
 }
+
+OpenGLGraphicsContextCustomShader::~OpenGLGraphicsContextCustomShader()
+{
+    if (OpenGLContext* context = OpenGLContext::getCurrentContext())
+        context->setAssociatedObject (hashName.toRawUTF8(), nullptr);
+}
+
+OpenGLShaderProgram* OpenGLGraphicsContextCustomShader::getProgram (LowLevelGraphicsContext& gc) const
+{
+    String errorMessage;
+
+    if (auto c = CustomProgram::getOrCreate (gc, hashName, code, errorMessage))
+        return &(c->program);
+
+    return {};
+}
+
+void OpenGLGraphicsContextCustomShader::fillRect (LowLevelGraphicsContext& gc, Rectangle<int> area) const
+{
+    String errorMessage;
+
+    if (auto sc = dynamic_cast<OpenGLRendering::ShaderContext*> (&gc))
+    {
+        if (auto c = CustomProgram::getOrCreate (gc, hashName, code, errorMessage))
+        {
+            c->onShaderActivated = onShaderActivated;
+            sc->fillRectWithCustomShader (*c, area);
+        }
+    }
+}
+
+Result OpenGLGraphicsContextCustomShader::checkCompilation (LowLevelGraphicsContext& gc)
+{
+    String errorMessage;
+
+    if (CustomProgram::getOrCreate (gc, hashName, code, errorMessage) != nullptr)
+        return Result::ok();
+
+    return Result::fail (errorMessage);
+}
+
+} // namespace juce

@@ -107,9 +107,9 @@ void audio_util::get_wav_file_metadata(std::string path, int* num_frames, int* b
         std::cerr << "Invalid input file: " << path << std::endl;
         return;
     }
-    FileInputStream* fis = input.createInputStream();
-    ScopedPointer<WavAudioFormat> wavFormat(new WavAudioFormat());
-    ScopedPointer<AudioFormatReader> afr(wavFormat->createReaderFor(fis, true));
+    std::unique_ptr<FileInputStream> fis = input.createInputStream();
+    std::unique_ptr<WavAudioFormat> wavFormat(new WavAudioFormat());
+    AudioFormatReader* afr(wavFormat->createReaderFor(fis.get(), true));
 
     // get info on target from JUCE
     *num_frames = afr->lengthInSamples;
@@ -119,6 +119,7 @@ void audio_util::get_wav_file_metadata(std::string path, int* num_frames, int* b
     // calculate more info on target
     *length_seconds = (*num_frames) / (*sampling_frequency);
     *nyquist_frequency = (*sampling_frequency) / 2;
+    DBG("audio_util: returning after reading wav file metadata");
 }
 
 void audio_util::load_wav_file(std::string path, int chunk_size, int num_frames, float* buffer) {
@@ -127,14 +128,14 @@ void audio_util::load_wav_file(std::string path, int chunk_size, int num_frames,
         std::cerr << "Invalid input file: " << path << std::endl;
         return;
     }
-    FileInputStream* fis = input.createInputStream();
-    ScopedPointer<WavAudioFormat> wavFormat(new WavAudioFormat());
-    ScopedPointer<AudioFormatReader> afr(wavFormat->createReaderFor(fis, true));
+    std::unique_ptr<FileInputStream> fis = input.createInputStream();
+    std::unique_ptr<WavAudioFormat> wavFormat(new WavAudioFormat());
+    AudioFormatReader* afr(wavFormat->createReaderFor(fis.get(), true));
 
     // get waveform of target
     AudioSampleBuffer asb(1, num_frames);
     afr->read(&asb, 0, num_frames, 0, false, true);
-    float* chanData = asb.getSampleData(0);
+    auto chanData = asb.getReadPointer(0);
     memcpy(buffer, chanData, sizeof(float) * num_frames);
 }
 

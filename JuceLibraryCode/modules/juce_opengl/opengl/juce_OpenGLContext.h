@@ -2,29 +2,31 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_OPENGLCONTEXT_H_INCLUDED
-#define JUCE_OPENGLCONTEXT_H_INCLUDED
+namespace juce
+{
 
+class OpenGLTexture;
 
 //==============================================================================
 /**
@@ -41,6 +43,8 @@
     stop and the native resources to be freed safely.
 
     @see OpenGLRenderer
+
+    @tags{OpenGL}
 */
 class JUCE_API  OpenGLContext
 {
@@ -87,12 +91,29 @@ public:
     /** Returns the component to which this context is currently attached, or nullptr. */
     Component* getTargetComponent() const noexcept;
 
+    /** If the given component has an OpenGLContext attached, then this will return it. */
+    static OpenGLContext* getContextAttachedTo (Component& component) noexcept;
+
     //==============================================================================
     /** Sets the pixel format which you'd like to use for the target GL surface.
         Note: This must be called BEFORE attaching your context to a target component!
     */
     void setPixelFormat (const OpenGLPixelFormat& preferredPixelFormat) noexcept;
 
+    /** Texture magnification filters, used by setTextureMagnificationFilter(). */
+    enum TextureMagnificationFilter
+    {
+        nearest,
+        linear
+    };
+
+    /** Sets the texture magnification filter. By default the texture magnification
+        filter is linear. However, for faster rendering you may want to use the
+        'nearest' magnification filter. This option will not affect any textures
+        created before this function was called. */
+    void setTextureMagnificationFilter (TextureMagnificationFilter magFilterMode) noexcept;
+
+     //==============================================================================
     /** Provides a context with which you'd like this context's resources to be shared.
         The object passed-in here is a platform-dependent native context object, and
         must not be deleted while this context may still be using it! To turn off sharing,
@@ -108,6 +129,32 @@ public:
 
     /** Returns true if shaders can be used in this context. */
     bool areShadersAvailable() const;
+
+    /** Returns true if non-power-of-two textures are supported in this context. */
+    bool isTextureNpotSupported() const;
+
+    /** OpenGL versions, used by setOpenGLVersionRequired().
+
+        The Core profile doesn't include some legacy functionality, including the
+        fixed-function pipeline.
+
+        The Compatibility profile is backwards-compatible, and includes functionality
+        deprecated in the Core profile. However, not all implementations provide
+        compatibility profiles targeting later versions of OpenGL. To run on the
+        broadest range of hardware, using the 3.2 Core profile is recommended.
+    */
+    enum OpenGLVersion
+    {
+        defaultGLVersion = 0, ///< Whatever the device decides to give us, normally a compatibility profile
+        openGL3_2,            ///< 3.2 Core profile
+        openGL4_1,            ///< 4.1 Core profile, the latest supported by macOS at time of writing
+        openGL4_3             ///< 4.3 Core profile, will enable improved debugging support when building in Debug
+    };
+
+    /** Sets a preference for the version of GL that this context should use, if possible.
+        Some platforms may ignore this value.
+    */
+    void setOpenGLVersionRequired (OpenGLVersion) noexcept;
 
     /** Enables or disables the use of the GL context to perform 2D rendering
         of the component to which it is attached.
@@ -204,9 +251,29 @@ public:
     int getSwapInterval() const;
 
     //==============================================================================
+    /** Execute a lambda, function or functor on the OpenGL thread with an active
+        context.
+
+        This method will attempt to execute functor on the OpenGL thread. If
+        blockUntilFinished is true then the method will block until the functor
+        has finished executing.
+
+        This function can only be called if the context is attached to a component.
+        Otherwise, this function will assert.
+
+        This function is useful when you need to execute house-keeping tasks such
+        as allocating, deallocating textures or framebuffers. As such, the functor
+        will execute without locking the message thread. Therefore, it is not
+        intended for any drawing commands or GUI code. Any GUI code should be
+        executed in the OpenGLRenderer::renderOpenGL callback instead.
+    */
+    template <typename T>
+    void executeOnGLThread (T&& functor, bool blockUntilFinished);
+
+    //==============================================================================
     /** Returns the scale factor used by the display that is being rendered.
 
-        The scale is that of the display - see Desktop::Displays::Display::scale
+        The scale is that of the display - see Displays::Display::scale
 
         Note that this should only be called during an OpenGLRenderer::renderOpenGL()
         callback - at other times the value it returns is undefined.
@@ -219,13 +286,19 @@ public:
     */
     unsigned int getFrameBufferID() const noexcept;
 
-    /** Returns an OS-dependent handle to some kind of underlting OS-provided GL context.
+    /** Returns an OS-dependent handle to some kind of underlying OS-provided GL context.
 
         The exact type of the value returned will depend on the OS and may change
         if the implementation changes. If you want to use this, digging around in the
         native code is probably the best way to find out what it is.
     */
     void* getRawContext() const noexcept;
+
+    /** Returns true if this context is using the core profile.
+
+        @see OpenGLVersion
+    */
+    bool isCoreProfile() const;
 
     /** This structure holds a set of dynamically loaded GL functions for use on this context. */
     OpenGLExtensionFunctions extensions;
@@ -250,26 +323,70 @@ public:
                       bool textureOriginIsBottomLeft);
 
 
+    /** Changes the amount of GPU memory that the internal cache for Images is allowed to use. */
+    void setImageCacheSize (size_t cacheSizeBytes) noexcept;
+
+    /** Returns the amount of GPU memory that the internal cache for Images is allowed to use. */
+    size_t getImageCacheSize() const noexcept;
+
     //==============================================================================
    #ifndef DOXYGEN
     class NativeContext;
    #endif
 
 private:
+    enum class InitResult
+    {
+        fatal,
+        retry,
+        success
+    };
+
+    friend class OpenGLTexture;
+
     class CachedImage;
     class Attachment;
-    NativeContext* nativeContext;
-    OpenGLRenderer* renderer;
-    double currentRenderScale;
-    ScopedPointer<Attachment> attachment;
-    OpenGLPixelFormat pixelFormat;
-    void* contextToShareWith;
-    bool renderComponents, useMultisampling, continuousRepaint;
+    NativeContext* nativeContext = nullptr;
+    OpenGLRenderer* renderer = nullptr;
+    double currentRenderScale = 1.0;
+    std::unique_ptr<Attachment> attachment;
+    OpenGLPixelFormat openGLPixelFormat;
+    void* contextToShareWith = nullptr;
+    OpenGLVersion versionRequired = defaultGLVersion;
+    size_t imageCacheMaxSize = 8 * 1024 * 1024;
+    bool renderComponents = true, useMultisampling = false, overrideCanAttach = false;
+    std::atomic<bool> continuousRepaint { false };
+    TextureMagnificationFilter texMagFilter = linear;
 
+    //==============================================================================
+    struct AsyncWorker  : public ReferenceCountedObject
+    {
+        using Ptr = ReferenceCountedObjectPtr<AsyncWorker>;
+        virtual void operator() (OpenGLContext&) = 0;
+        ~AsyncWorker() override = default;
+    };
+
+    template <typename FunctionType>
+    struct AsyncWorkerFunctor  : public AsyncWorker
+    {
+        AsyncWorkerFunctor (FunctionType functorToUse) : functor (functorToUse) {}
+        void operator() (OpenGLContext& callerContext) override     { functor (callerContext); }
+        FunctionType functor;
+
+        JUCE_DECLARE_NON_COPYABLE (AsyncWorkerFunctor)
+    };
+
+    //==============================================================================
     CachedImage* getCachedImage() const noexcept;
+    void execute (AsyncWorker::Ptr, bool);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenGLContext)
 };
 
+//==============================================================================
+#ifndef DOXYGEN
+template <typename FunctionType>
+void OpenGLContext::executeOnGLThread (FunctionType&& f, bool shouldBlock) { execute (new AsyncWorkerFunctor<FunctionType> (f), shouldBlock); }
+#endif
 
-#endif   // JUCE_OPENGLCONTEXT_H_INCLUDED
+} // namespace juce

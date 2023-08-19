@@ -2,25 +2,114 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
+
+class Version
+{
+public:
+    constexpr Version() = default;
+
+    constexpr explicit Version (int majorIn)
+        : Version (majorIn, 0) {}
+
+    constexpr Version (int majorIn, int minorIn)
+        : major (majorIn), minor (minorIn) {}
+
+    int major = 0, minor = 0;
+
+    constexpr bool operator== (const Version& other) const noexcept
+    {
+        return toTuple() == other.toTuple();
+    }
+
+    constexpr bool operator!= (const Version& other) const noexcept
+    {
+        return toTuple() != other.toTuple();
+    }
+
+    constexpr bool operator< (const Version& other) const noexcept
+    {
+        return toTuple() < other.toTuple();
+    }
+
+    constexpr bool operator<= (const Version& other) const noexcept
+    {
+        return toTuple() <= other.toTuple();
+    }
+
+    constexpr bool operator> (const Version& other) const noexcept
+    {
+        return toTuple() > other.toTuple();
+    }
+
+    constexpr bool operator>= (const Version& other) const noexcept
+    {
+        return toTuple() >= other.toTuple();
+    }
+
+private:
+    constexpr std::tuple<int, int> toTuple() const noexcept
+    {
+        return std::make_tuple (major, minor);
+    }
+};
+
+
+template <typename Char>
+static auto* findNullTerminator (const Char* ptr)
+{
+    while (*ptr != 0)
+        ++ptr;
+
+    return ptr;
+}
+
+static Version getOpenGLVersion()
+{
+    const auto* versionBegin = glGetString (GL_VERSION);
+
+    if (versionBegin == nullptr)
+        return {};
+
+    const auto* versionEnd = findNullTerminator (versionBegin);
+    const std::string versionString (versionBegin, versionEnd);
+    const auto spaceSeparated = StringArray::fromTokens (versionString.c_str(), false);
+
+    for (const auto& token : spaceSeparated)
+    {
+        const auto pointSeparated = StringArray::fromTokens (token, ".", "");
+
+        const auto major = pointSeparated[0].getIntValue();
+        const auto minor = pointSeparated[1].getIntValue();
+
+        if (major != 0)
+            return { major, minor };
+    }
+
+    return {};
+}
 
 void OpenGLHelpers::resetErrorState()
 {
@@ -31,7 +120,7 @@ void* OpenGLHelpers::getExtensionFunction (const char* functionName)
 {
    #if JUCE_WINDOWS
     return (void*) wglGetProcAddress (functionName);
-   #elif JUCE_LINUX
+   #elif JUCE_LINUX || JUCE_BSD
     return (void*) glXGetProcAddress ((const GLubyte*) functionName);
    #else
     static void* handle = dlopen (nullptr, RTLD_LAZY);
@@ -43,6 +132,23 @@ bool OpenGLHelpers::isExtensionSupported (const char* const extensionName)
 {
     jassert (extensionName != nullptr); // you must supply a genuine string for this.
     jassert (isContextActive()); // An OpenGL context will need to be active before calling this.
+
+    if (getOpenGLVersion().major >= 3)
+    {
+        using GetStringi = const GLubyte* (*) (GLenum, GLuint);
+
+        if (auto* thisGlGetStringi = reinterpret_cast<GetStringi> (getExtensionFunction ("glGetStringi")))
+        {
+            GLint n = 0;
+            glGetIntegerv (GL_NUM_EXTENSIONS, &n);
+
+            for (auto i = (decltype (n)) 0; i < n; ++i)
+                if (StringRef (extensionName) == StringRef ((const char*) thisGlGetStringi (GL_EXTENSIONS, (GLuint) i)))
+                    return true;
+
+            return false;
+        }
+    }
 
     const char* extensions = (const char*) glGetString (GL_EXTENSIONS);
     jassert (extensions != nullptr); // Perhaps you didn't activate an OpenGL context before calling this?
@@ -71,212 +177,70 @@ void OpenGLHelpers::clear (Colour colour)
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
-#if JUCE_USE_OPENGL_FIXED_FUNCTION
-void OpenGLHelpers::setColour (Colour colour)
-{
-    glColor4f (colour.getFloatRed(), colour.getFloatGreen(),
-               colour.getFloatBlue(), colour.getFloatAlpha());
-}
-
-void OpenGLHelpers::prepareFor2D (const int width, const int height)
-{
-    glMatrixMode (GL_PROJECTION);
-    glLoadIdentity();
-
-   #if JUCE_OPENGL_ES
-    glOrthof (0.0f, (GLfloat) width, 0.0f, (GLfloat) height, 0.0f, 1.0f);
-   #else
-    glOrtho  (0.0, width, 0.0, height, 0, 1);
-   #endif
-
-    glViewport (0, 0, width, height);
-}
-
-void OpenGLHelpers::setPerspective (double fovy, double aspect, double zNear, double zFar)
-{
-    glLoadIdentity();
-
-   #if JUCE_OPENGL_ES
-    const GLfloat ymax = (GLfloat) (zNear * tan (fovy * double_Pi / 360.0));
-    const GLfloat ymin = -ymax;
-
-    glFrustumf (ymin * (GLfloat) aspect, ymax * (GLfloat) aspect, ymin, ymax, (GLfloat) zNear, (GLfloat) zFar);
-   #else
-    const double ymax = zNear * tan (fovy * double_Pi / 360.0);
-    const double ymin = -ymax;
-
-    glFrustum  (ymin * aspect, ymax * aspect, ymin, ymax, zNear, zFar);
-   #endif
-}
-
-void OpenGLHelpers::applyTransform (const AffineTransform& t)
-{
-    const GLfloat m[] = { t.mat00, t.mat10, 0, 0,
-                          t.mat01, t.mat11, 0, 0,
-                          0,       0,       1, 0,
-                          t.mat02, t.mat12, 0, 1 };
-    glMultMatrixf (m);
-}
-
-void OpenGLHelpers::applyMatrix (const float matrixValues[16])
-{
-    glMultMatrixf (matrixValues);
-}
-
-#if ! JUCE_OPENGL_ES
-void OpenGLHelpers::applyMatrix (const double matrixValues[16])
-{
-    glMultMatrixd (matrixValues);
-}
-#endif
-#endif
-
-void OpenGLHelpers::enableScissorTest (const Rectangle<int>& clip)
+void OpenGLHelpers::enableScissorTest (Rectangle<int> clip)
 {
     glEnable (GL_SCISSOR_TEST);
     glScissor (clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight());
 }
 
-#if JUCE_USE_OPENGL_FIXED_FUNCTION
-void OpenGLHelpers::drawQuad2D (float x1, float y1,
-                                float x2, float y2,
-                                float x3, float y3,
-                                float x4, float y4,
-                                Colour colour)
+String OpenGLHelpers::getGLSLVersionString()
 {
-    const GLfloat vertices[]      = { x1, y1, x2, y2, x4, y4, x3, y3 };
-    const GLfloat textureCoords[] = { 0, 0, 1.0f, 0, 0, 1.0f, 1.0f, 1.0f };
-
-    setColour (colour);
-
-    glEnableClientState (GL_VERTEX_ARRAY);
-    glVertexPointer (2, GL_FLOAT, 0, vertices);
-
-    glEnableClientState (GL_TEXTURE_COORD_ARRAY);
-    glTexCoordPointer (2, GL_FLOAT, 0, textureCoords);
-
-    glDisableClientState (GL_COLOR_ARRAY);
-    glDisableClientState (GL_NORMAL_ARRAY);
-
-    glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
-}
-
-void OpenGLHelpers::drawQuad3D (float x1, float y1, float z1,
-                                float x2, float y2, float z2,
-                                float x3, float y3, float z3,
-                                float x4, float y4, float z4,
-                                Colour colour)
-{
-    const GLfloat vertices[]      = { x1, y1, z1, x2, y2, z2, x4, y4, z4, x3, y3, z3 };
-    const GLfloat textureCoords[] = { 0, 0, 1.0f, 0, 0, 1.0f, 1.0f, 1.0f };
-
-    setColour (colour);
-
-    glEnableClientState (GL_VERTEX_ARRAY);
-    glVertexPointer (3, GL_FLOAT, 0, vertices);
-
-    glEnableClientState (GL_TEXTURE_COORD_ARRAY);
-    glTexCoordPointer (2, GL_FLOAT, 0, textureCoords);
-
-    glDisableClientState (GL_COLOR_ARRAY);
-    glDisableClientState (GL_NORMAL_ARRAY);
-
-    glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
-}
-
-void OpenGLHelpers::drawTriangleStrip (const GLfloat* const vertices, const GLfloat* const textureCoords, const int numVertices) noexcept
-{
-   #if ! JUCE_ANDROID
-    glEnable (GL_TEXTURE_2D);
-    clearGLError();
-   #endif
-    glDisableClientState (GL_COLOR_ARRAY);
-    glDisableClientState (GL_NORMAL_ARRAY);
-    glEnableClientState (GL_VERTEX_ARRAY);
-    glVertexPointer (2, GL_FLOAT, 0, vertices);
-    glEnableClientState (GL_TEXTURE_COORD_ARRAY);
-    glTexCoordPointer (2, GL_FLOAT, 0, textureCoords);
-    glDrawArrays (GL_TRIANGLE_STRIP, 0, numVertices);
-}
-
-void OpenGLHelpers::drawTriangleStrip (const GLfloat* const vertices, const GLfloat* const textureCoords,
-                                       const int numVertices, const GLuint textureID) noexcept
-{
-    jassert (textureID != 0);
-    glBindTexture (GL_TEXTURE_2D, textureID);
-    drawTriangleStrip (vertices, textureCoords, numVertices);
-    glBindTexture (GL_TEXTURE_2D, 0);
-}
-
-void OpenGLHelpers::drawTextureQuad (GLuint textureID, const Rectangle<int>& rect)
-{
-    const GLfloat l = (GLfloat) rect.getX();
-    const GLfloat t = (GLfloat) rect.getY();
-    const GLfloat r = (GLfloat) rect.getRight();
-    const GLfloat b = (GLfloat) rect.getBottom();
-
-    const GLfloat vertices[]      = { l, t, r, t, l, b, r, b };
-    const GLfloat textureCoords[] = { 0, 1.0f, 1.0f, 1.0f, 0, 0, 1.0f, 0 };
-
-    drawTriangleStrip (vertices, textureCoords, 4, textureID);
-}
-
-void OpenGLHelpers::fillRectWithTexture (const Rectangle<int>& rect, GLuint textureID, const float alpha)
-{
-    glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glColor4f (alpha, alpha, alpha, alpha);
-
-    drawTextureQuad (textureID, rect);
-}
-
-void OpenGLHelpers::fillRectWithColour (const Rectangle<int>& rect, Colour colour)
-{
-    glEnableClientState (GL_VERTEX_ARRAY);
-    glDisableClientState (GL_TEXTURE_COORD_ARRAY);
-    glDisableClientState (GL_COLOR_ARRAY);
-    glDisableClientState (GL_NORMAL_ARRAY);
-    setColour (colour);
-    fillRect (rect);
-}
-
-void OpenGLHelpers::fillRect (const Rectangle<int>& rect)
-{
-    const GLfloat vertices[] = { (GLfloat) rect.getX(),     (GLfloat) rect.getY(),
-                                 (GLfloat) rect.getRight(), (GLfloat) rect.getY(),
-                                 (GLfloat) rect.getX(),     (GLfloat) rect.getBottom(),
-                                 (GLfloat) rect.getRight(), (GLfloat) rect.getBottom() };
-
-    glVertexPointer (2, GL_FLOAT, 0, vertices);
-    glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
-}
-#endif
-
-//==============================================================================
-OpenGLTextureFromImage::OpenGLTextureFromImage (const Image& image)
-    : imageWidth (image.getWidth()),
-      imageHeight (image.getHeight())
-{
-    JUCE_CHECK_OPENGL_ERROR
-    if (OpenGLFrameBuffer* const fb = OpenGLImageType::getFrameBufferFrom (image))
+    if (getOpenGLVersion() >= Version (3, 2))
     {
-        textureID = fb->getTextureID();
-        fullWidthProportion  = 1.0f;
-        fullHeightProportion = 1.0f;
-    }
-    else
-    {
-        texture = new OpenGLTexture();
-        texture->loadImage (image);
-        textureID = texture->getTextureID();
-
-        fullWidthProportion  = imageWidth  / (float) texture->getWidth();
-        fullHeightProportion = imageHeight / (float) texture->getHeight();
+       #if JUCE_OPENGL_ES
+        return "#version 300 es";
+       #else
+        return "#version 150";
+       #endif
     }
 
-    JUCE_CHECK_OPENGL_ERROR
+    return "#version 110";
 }
 
-OpenGLTextureFromImage::~OpenGLTextureFromImage() {}
+String OpenGLHelpers::translateVertexShaderToV3 (const String& code)
+{
+    if (getOpenGLVersion() >= Version (3, 2))
+    {
+        String output;
+
+       #if JUCE_ANDROID
+        {
+            int numAttributes = 0;
+
+            for (int p = code.indexOf (0, "attribute "); p >= 0; p = code.indexOf (p + 1, "attribute "))
+                numAttributes++;
+
+            int last = 0;
+
+            for (int p = code.indexOf (0, "attribute "); p >= 0; p = code.indexOf (p + 1, "attribute "))
+            {
+                output += code.substring (last, p) + "layout(location=" + String (--numAttributes) + ") in ";
+
+                last = p + 10;
+            }
+
+            output += code.substring (last);
+        }
+       #else
+        output = code.replace ("attribute", "in");
+       #endif
+
+        return getGLSLVersionString() + "\n" + output.replace ("varying", "out");
+    }
+
+    return code;
+}
+
+String OpenGLHelpers::translateFragmentShaderToV3 (const String& code)
+{
+    if (getOpenGLVersion() >= Version (3, 2))
+        return getGLSLVersionString() + "\n"
+               "out " JUCE_MEDIUMP " vec4 fragColor;\n"
+                + code.replace ("varying", "in")
+                      .replace ("texture2D", "texture")
+                      .replace ("gl_FragColor", "fragColor");
+
+    return code;
+}
+
+} // namespace juce

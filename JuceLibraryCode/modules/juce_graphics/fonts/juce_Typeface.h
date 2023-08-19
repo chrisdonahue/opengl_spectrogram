@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_TYPEFACE_H_INCLUDED
-#define JUCE_TYPEFACE_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -34,19 +34,21 @@
     a platform-specific subclass that can be used.
 
     The CustomTypeface subclass allow you to build your own typeface, and to
-    load and save it in the Juce typeface format.
+    load and save it in the JUCE typeface format.
 
     Normally you should never need to deal directly with Typeface objects - the Font
     class does everything you typically need for rendering text.
 
     @see CustomTypeface, Font
+
+    @tags{Graphics}
 */
 class JUCE_API  Typeface  : public ReferenceCountedObject
 {
 public:
     //==============================================================================
     /** A handy typedef for a pointer to a typeface. */
-    typedef ReferenceCountedObjectPtr <Typeface> Ptr;
+    using Ptr = ReferenceCountedObjectPtr<Typeface>;
 
     //==============================================================================
     /** Returns the font family of the typeface.
@@ -64,9 +66,15 @@ public:
     /** Creates a new system typeface. */
     static Ptr createSystemTypefaceFor (const Font& font);
 
+    /** Attempts to create a font from some raw font file data (e.g. a TTF or OTF file image).
+        The system will take its own internal copy of the data, so you can free the block once
+        this method has returned.
+    */
+    static Ptr createSystemTypefaceFor (const void* fontFileData, size_t fontFileDataSize);
+
     //==============================================================================
     /** Destructor. */
-    virtual ~Typeface();
+    ~Typeface() override;
 
     /** Returns true if this typeface can be used to render the specified font.
         When called, the font will already have been checked to make sure that its name and
@@ -88,7 +96,7 @@ public:
     */
     virtual float getDescent() const = 0;
 
-    /** Returns the value by which you should multiply a juce font-height value to
+    /** Returns the value by which you should multiply a JUCE font-height value to
         convert it to the equivalent point-size.
     */
     virtual float getHeightToPointsFactor() const = 0;
@@ -103,15 +111,15 @@ public:
         The distances returned are based on the font having an normalised height of 1.0.
         You should never need to call this directly! Use Font::getGlyphPositions() instead!
     */
-    virtual void getGlyphPositions (const String& text, Array <int>& glyphs, Array<float>& xOffsets) = 0;
+    virtual void getGlyphPositions (const String& text, Array<int>& glyphs, Array<float>& xOffsets) = 0;
 
     /** Returns the outline for a glyph.
         The path returned will be normalised to a font height of 1.0.
     */
     virtual bool getOutlineForGlyph (int glyphNumber, Path& path) = 0;
 
-    /** Returns a new EdgeTable that contains the path for the givem glyph, with the specified transform applied. */
-    virtual EdgeTable* getEdgeTableForGlyph (int glyphNumber, const AffineTransform& transform);
+    /** Returns a new EdgeTable that contains the path for the given glyph, with the specified transform applied. */
+    virtual EdgeTable* getEdgeTableForGlyph (int glyphNumber, const AffineTransform& transform, float fontHeight);
 
     /** Returns true if the typeface uses hinting. */
     virtual bool isHinted() const                           { return false; }
@@ -124,9 +132,15 @@ public:
     static void clearTypefaceCache();
 
     /** On some platforms, this allows a specific path to be scanned.
-        Currently only available when using FreeType.
+        On macOS you can load .ttf and .otf files, otherwise this is only available when using FreeType.
     */
     static void scanFolderForFonts (const File& folder);
+
+    /** Makes an attempt at performing a good overall distortion that will scale a font of
+        the given size to align vertically with the pixel grid. The path should be an unscaled
+        (i.e. normalised to height of 1.0) path for a glyph.
+    */
+    void applyVerticalHintingTransform (float fontHeight, Path& path);
 
 protected:
     //==============================================================================
@@ -137,8 +151,11 @@ protected:
     static Ptr getFallbackTypeface();
 
 private:
+    struct HintingParams;
+    std::unique_ptr<HintingParams> hintingParams;
+    CriticalSection hintingLock;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Typeface)
 };
 
-
-#endif   // JUCE_TYPEFACE_H_INCLUDED
+} // namespace juce
