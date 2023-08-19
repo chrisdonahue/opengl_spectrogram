@@ -2,72 +2,64 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
+
+static constexpr bool isNonBreakingSpace (const juce_wchar c)
+{
+    return c == 0x00a0
+        || c == 0x2007
+        || c == 0x202f
+        || c == 0x2060;
+}
 
 PositionedGlyph::PositionedGlyph() noexcept
     : character (0), glyph (0), x (0), y (0), w (0), whitespace (false)
 {
 }
 
-PositionedGlyph::PositionedGlyph (const Font& font_, const juce_wchar character_, const int glyph_,
-                                  const float x_, const float y_, const float w_, const bool whitespace_)
-    : font (font_), character (character_), glyph (glyph_),
-      x (x_), y (y_), w (w_), whitespace (whitespace_)
+PositionedGlyph::PositionedGlyph (const Font& font_, juce_wchar character_, int glyphNumber,
+                                  float anchorX, float baselineY, float width, bool whitespace_)
+    : font (font_), character (character_), glyph (glyphNumber),
+      x (anchorX), y (baselineY), w (width), whitespace (whitespace_)
 {
 }
 
-PositionedGlyph::PositionedGlyph (const PositionedGlyph& other)
-    : font (other.font), character (other.character), glyph (other.glyph),
-      x (other.x), y (other.y), w (other.w), whitespace (other.whitespace)
+static void drawGlyphWithFont (Graphics& g, int glyph, const Font& font, AffineTransform t)
 {
-}
-
-PositionedGlyph::~PositionedGlyph() {}
-
-PositionedGlyph& PositionedGlyph::operator= (const PositionedGlyph& other)
-{
-    font = other.font;
-    character = other.character;
-    glyph = other.glyph;
-    x = other.x;
-    y = other.y;
-    w = other.w;
-    whitespace = other.whitespace;
-    return *this;
-}
-
-static inline void drawGlyphWithFont (const Graphics& g, int glyph, const Font& font, const AffineTransform& t)
-{
-    LowLevelGraphicsContext& context = g.getInternalContext();
+    auto& context = g.getInternalContext();
     context.setFont (font);
     context.drawGlyph (glyph, t);
 }
 
-void PositionedGlyph::draw (const Graphics& g) const
+void PositionedGlyph::draw (Graphics& g) const
 {
     if (! isWhitespace())
         drawGlyphWithFont (g, glyph, font, AffineTransform::translation (x, y));
 }
 
-void PositionedGlyph::draw (const Graphics& g, const AffineTransform& transform) const
+void PositionedGlyph::draw (Graphics& g, AffineTransform transform) const
 {
     if (! isWhitespace())
         drawGlyphWithFont (g, glyph, font, AffineTransform::translation (x, y).followedBy (transform));
@@ -77,7 +69,7 @@ void PositionedGlyph::createPath (Path& path) const
 {
     if (! isWhitespace())
     {
-        if (Typeface* const t = font.getTypeface())
+        if (auto t = font.getTypefacePtr())
         {
             Path p;
             t->getOutlineForGlyph (glyph, p);
@@ -92,7 +84,7 @@ bool PositionedGlyph::hitTest (float px, float py) const
 {
     if (getBounds().contains (px, py) && ! isWhitespace())
     {
-        if (Typeface* const t = font.getTypeface())
+        if (auto t = font.getTypefacePtr())
         {
             Path p;
             t->getOutlineForGlyph (glyph, p);
@@ -108,8 +100,7 @@ bool PositionedGlyph::hitTest (float px, float py) const
     return false;
 }
 
-void PositionedGlyph::moveBy (const float deltaX,
-                              const float deltaY)
+void PositionedGlyph::moveBy (float deltaX, float deltaY)
 {
     x += deltaX;
     y += deltaY;
@@ -122,28 +113,13 @@ GlyphArrangement::GlyphArrangement()
     glyphs.ensureStorageAllocated (128);
 }
 
-GlyphArrangement::GlyphArrangement (const GlyphArrangement& other)
-    : glyphs (other.glyphs)
-{
-}
-
-GlyphArrangement& GlyphArrangement::operator= (const GlyphArrangement& other)
-{
-    glyphs = other.glyphs;
-    return *this;
-}
-
-GlyphArrangement::~GlyphArrangement()
-{
-}
-
 //==============================================================================
 void GlyphArrangement::clear()
 {
     glyphs.clear();
 }
 
-PositionedGlyph& GlyphArrangement::getGlyph (const int index) const noexcept
+PositionedGlyph& GlyphArrangement::getGlyph (int index) noexcept
 {
     return glyphs.getReference (index);
 }
@@ -159,40 +135,34 @@ void GlyphArrangement::addGlyph (const PositionedGlyph& glyph)
     glyphs.add (glyph);
 }
 
-void GlyphArrangement::removeRangeOfGlyphs (int startIndex, const int num)
+void GlyphArrangement::removeRangeOfGlyphs (int startIndex, int num)
 {
     glyphs.removeRange (startIndex, num < 0 ? glyphs.size() : num);
 }
 
 //==============================================================================
-void GlyphArrangement::addLineOfText (const Font& font,
-                                      const String& text,
-                                      const float xOffset,
-                                      const float yOffset)
+void GlyphArrangement::addLineOfText (const Font& font, const String& text, float xOffset, float yOffset)
 {
     addCurtailedLineOfText (font, text, xOffset, yOffset, 1.0e10f, false);
 }
 
-void GlyphArrangement::addCurtailedLineOfText (const Font& font,
-                                               const String& text,
-                                               const float xOffset,
-                                               const float yOffset,
-                                               const float maxWidthPixels,
-                                               const bool useEllipsis)
+void GlyphArrangement::addCurtailedLineOfText (const Font& font, const String& text,
+                                               float xOffset, float yOffset,
+                                               float maxWidthPixels, bool useEllipsis)
 {
     if (text.isNotEmpty())
     {
-        Array <int> newGlyphs;
-        Array <float> xOffsets;
+        Array<int> newGlyphs;
+        Array<float> xOffsets;
         font.getGlyphPositions (text, newGlyphs, xOffsets);
-        const int textLen = newGlyphs.size();
+        auto textLen = newGlyphs.size();
         glyphs.ensureStorageAllocated (glyphs.size() + textLen);
 
-        String::CharPointerType t (text.getCharPointer());
+        auto t = text.getCharPointer();
 
         for (int i = 0; i < textLen; ++i)
         {
-            const float nextX = xOffsets.getUnchecked (i + 1);
+            auto nextX = xOffsets.getUnchecked (i + 1);
 
             if (nextX > maxWidthPixels + 1.0f)
             {
@@ -202,37 +172,34 @@ void GlyphArrangement::addCurtailedLineOfText (const Font& font,
 
                 break;
             }
-            else
-            {
-                const float thisX = xOffsets.getUnchecked (i);
-                const bool isWhitespace = t.isWhitespace();
 
-                glyphs.add (PositionedGlyph (font, t.getAndAdvance(),
-                                             newGlyphs.getUnchecked(i),
-                                             xOffset + thisX, yOffset,
-                                             nextX - thisX, isWhitespace));
-            }
+            auto thisX = xOffsets.getUnchecked (i);
+            auto isWhitespace = isNonBreakingSpace (*t) || t.isWhitespace();
+
+            glyphs.add (PositionedGlyph (font, t.getAndAdvance(),
+                                         newGlyphs.getUnchecked(i),
+                                         xOffset + thisX, yOffset,
+                                         nextX - thisX, isWhitespace));
         }
     }
 }
 
-int GlyphArrangement::insertEllipsis (const Font& font, const float maxXPos,
-                                      const int startIndex, int endIndex)
+int GlyphArrangement::insertEllipsis (const Font& font, float maxXPos, int startIndex, int endIndex)
 {
     int numDeleted = 0;
 
-    if (glyphs.size() > 0)
+    if (! glyphs.isEmpty())
     {
         Array<int> dotGlyphs;
         Array<float> dotXs;
         font.getGlyphPositions ("..", dotGlyphs, dotXs);
 
-        const float dx = dotXs[1];
+        auto dx = dotXs[1];
         float xOffset = 0.0f, yOffset = 0.0f;
 
         while (endIndex > startIndex)
         {
-            const PositionedGlyph& pg = glyphs.getReference (--endIndex);
+            auto& pg = glyphs.getReference (--endIndex);
             xOffset = pg.x;
             yOffset = pg.y;
 
@@ -258,16 +225,15 @@ int GlyphArrangement::insertEllipsis (const Font& font, const float maxXPos,
     return numDeleted;
 }
 
-void GlyphArrangement::addJustifiedText (const Font& font,
-                                         const String& text,
-                                         float x, float y,
-                                         const float maxLineWidth,
-                                         Justification horizontalLayout)
+void GlyphArrangement::addJustifiedText (const Font& font, const String& text,
+                                         float x, float y, float maxLineWidth,
+                                         Justification horizontalLayout,
+                                         float leading)
 {
-    int lineStartIndex = glyphs.size();
+    auto lineStartIndex = glyphs.size();
     addLineOfText (font, text, x, y);
 
-    const float originalY = y;
+    auto originalY = y;
 
     while (lineStartIndex < glyphs.size())
     {
@@ -277,13 +243,13 @@ void GlyphArrangement::addJustifiedText (const Font& font,
               && glyphs.getReference(i).getCharacter() != '\r')
             ++i;
 
-        const float lineMaxX = glyphs.getReference (lineStartIndex).getLeft() + maxLineWidth;
+        auto lineMaxX = glyphs.getReference (lineStartIndex).getLeft() + maxLineWidth;
         int lastWordBreakIndex = -1;
 
         while (i < glyphs.size())
         {
-            const PositionedGlyph& pg = glyphs.getReference (i);
-            const juce_wchar c = pg.getCharacter();
+            auto& pg = glyphs.getReference (i);
+            auto c = pg.getCharacter();
 
             if (c == '\r' || c == '\n')
             {
@@ -295,7 +261,8 @@ void GlyphArrangement::addJustifiedText (const Font& font,
 
                 break;
             }
-            else if (pg.isWhitespace())
+
+            if (pg.isWhitespace())
             {
                 lastWordBreakIndex = i + 1;
             }
@@ -310,8 +277,8 @@ void GlyphArrangement::addJustifiedText (const Font& font,
             ++i;
         }
 
-        const float currentLineStartX = glyphs.getReference (lineStartIndex).getLeft();
-        float currentLineEndX = currentLineStartX;
+        auto currentLineStartX = glyphs.getReference (lineStartIndex).getLeft();
+        auto currentLineEndX = currentLineStartX;
 
         for (int j = i; --j >= lineStartIndex;)
         {
@@ -336,191 +303,57 @@ void GlyphArrangement::addJustifiedText (const Font& font,
 
         lineStartIndex = i;
 
-        y += font.getHeight();
+        y += font.getHeight() + leading;
     }
 }
 
-void GlyphArrangement::addFittedText (const Font& f,
-                                      const String& text,
-                                      const float x, const float y,
-                                      const float width, const float height,
-                                      Justification layout,
-                                      int maximumLines,
-                                      const float minimumHorizontalScale)
+void GlyphArrangement::addFittedText (const Font& f, const String& text,
+                                      float x, float y, float width, float height,
+                                      Justification layout, int maximumLines,
+                                      float minimumHorizontalScale)
 {
+    if (approximatelyEqual (minimumHorizontalScale, 0.0f))
+        minimumHorizontalScale = Font::getDefaultMinimumHorizontalScaleFactor();
+
     // doesn't make much sense if this is outside a sensible range of 0.5 to 1.0
     jassert (minimumHorizontalScale > 0 && minimumHorizontalScale <= 1.0f);
 
     if (text.containsAnyOf ("\r\n"))
     {
-        GlyphArrangement ga;
-        ga.addJustifiedText (f, text, x, y, width, layout);
-
-        const Rectangle<float> bb (ga.getBoundingBox (0, -1, false));
-
-        float dy = y - bb.getY();
-
-        if (layout.testFlags (Justification::verticallyCentred))   dy += (height - bb.getHeight()) * 0.5f;
-        else if (layout.testFlags (Justification::bottom))         dy += (height - bb.getHeight());
-
-        ga.moveRangeOfGlyphs (0, -1, 0.0f, dy);
-
-        glyphs.addArray (ga.glyphs);
-        return;
+        addLinesWithLineBreaks (text, f, x, y, width, height, layout);
     }
-
-    int startIndex = glyphs.size();
-    addLineOfText (f, text.trim(), x, y);
-
-    if (glyphs.size() > startIndex)
+    else
     {
-        float lineWidth = glyphs.getReference (glyphs.size() - 1).getRight()
-                            - glyphs.getReference (startIndex).getLeft();
+        auto startIndex = glyphs.size();
+        auto trimmed = text.trim();
+        addLineOfText (f, trimmed, x, y);
+        auto numGlyphs = glyphs.size() - startIndex;
 
-        if (lineWidth <= 0)
-            return;
-
-        if (lineWidth * minimumHorizontalScale < width)
+        if (numGlyphs > 0)
         {
-            if (lineWidth > width)
-                stretchRangeOfGlyphs (startIndex, glyphs.size() - startIndex,
-                                      width / lineWidth);
+            auto lineWidth = glyphs.getReference (glyphs.size() - 1).getRight()
+                                - glyphs.getReference (startIndex).getLeft();
 
-            justifyGlyphs (startIndex, glyphs.size() - startIndex,
-                           x, y, width, height, layout);
-        }
-        else if (maximumLines <= 1)
-        {
-            fitLineIntoSpace (startIndex, glyphs.size() - startIndex,
-                              x, y, width, height, f, layout, minimumHorizontalScale);
-        }
-        else
-        {
-            Font font (f);
-            String txt (text.trim());
-            const int length = txt.length();
-            const int originalStartIndex = startIndex;
-            int numLines = 1;
-
-            if (length <= 12 && ! txt.containsAnyOf (" -\t\r\n"))
-                maximumLines = 1;
-
-            maximumLines = jmin (maximumLines, length);
-
-            while (numLines < maximumLines)
+            if (lineWidth > 0)
             {
-                ++numLines;
-
-                const float newFontHeight = height / (float) numLines;
-
-                if (newFontHeight < font.getHeight())
+                if (lineWidth * minimumHorizontalScale < width)
                 {
-                    font.setHeight (jmax (8.0f, newFontHeight));
+                    if (lineWidth > width)
+                        stretchRangeOfGlyphs (startIndex, numGlyphs, width / lineWidth);
 
-                    removeRangeOfGlyphs (startIndex, -1);
-                    addLineOfText (font, txt, x, y);
-
-                    lineWidth = glyphs.getReference (glyphs.size() - 1).getRight()
-                                    - glyphs.getReference (startIndex).getLeft();
+                    justifyGlyphs (startIndex, numGlyphs, x, y, width, height, layout);
                 }
-
-                if (numLines > lineWidth / width || newFontHeight < 8.0f)
-                    break;
-            }
-
-            if (numLines < 1)
-                numLines = 1;
-
-            float lineY = y;
-            float widthPerLine = lineWidth / numLines;
-
-            for (int line = 0; line < numLines; ++line)
-            {
-                int i = startIndex;
-                float lineStartX = glyphs.getReference (startIndex).getLeft();
-
-                if (line == numLines - 1)
+                else if (maximumLines <= 1)
                 {
-                    widthPerLine = width;
-                    i = glyphs.size();
+                    fitLineIntoSpace (startIndex, numGlyphs, x, y, width, height,
+                                      f, layout, minimumHorizontalScale);
                 }
                 else
                 {
-                    while (i < glyphs.size())
-                    {
-                        lineWidth = (glyphs.getReference (i).getRight() - lineStartX);
-
-                        if (lineWidth > widthPerLine)
-                        {
-                            // got to a point where the line's too long, so skip forward to find a
-                            // good place to break it..
-                            const int searchStartIndex = i;
-
-                            while (i < glyphs.size())
-                            {
-                                if ((glyphs.getReference (i).getRight() - lineStartX) * minimumHorizontalScale < width)
-                                {
-                                    if (glyphs.getReference (i).isWhitespace()
-                                         || glyphs.getReference (i).getCharacter() == '-')
-                                    {
-                                        ++i;
-                                        break;
-                                    }
-                                }
-                                else
-                                {
-                                    // can't find a suitable break, so try looking backwards..
-                                    i = searchStartIndex;
-
-                                    for (int back = 1; back < jmin (7, i - startIndex - 1); ++back)
-                                    {
-                                        if (glyphs.getReference (i - back).isWhitespace()
-                                             || glyphs.getReference (i - back).getCharacter() == '-')
-                                        {
-                                            i -= back - 1;
-                                            break;
-                                        }
-                                    }
-
-                                    break;
-                                }
-
-                                ++i;
-                            }
-
-                            break;
-                        }
-
-                        ++i;
-                    }
-
-                    int wsStart = i;
-                    while (wsStart > 0 && glyphs.getReference (wsStart - 1).isWhitespace())
-                        --wsStart;
-
-                    int wsEnd = i;
-
-                    while (wsEnd < glyphs.size() && glyphs.getReference (wsEnd).isWhitespace())
-                        ++wsEnd;
-
-                    removeRangeOfGlyphs (wsStart, wsEnd - wsStart);
-                    i = jmax (wsStart, startIndex + 1);
+                    splitLines (trimmed, f, startIndex, x, y, width, height,
+                                maximumLines, lineWidth, layout, minimumHorizontalScale);
                 }
-
-                i -= fitLineIntoSpace (startIndex, i - startIndex,
-                                       x, lineY, width, font.getHeight(), font,
-                                       layout.getOnlyHorizontalFlags() | Justification::verticallyCentred,
-                                       minimumHorizontalScale);
-
-                startIndex = i;
-                lineY += font.getHeight();
-
-                if (startIndex >= glyphs.size())
-                    break;
             }
-
-            justifyGlyphs (originalStartIndex, glyphs.size() - originalStartIndex,
-                           x, y, width, height, layout.getFlags() & ~Justification::horizontallyJustified);
         }
     }
 }
@@ -530,7 +363,7 @@ void GlyphArrangement::moveRangeOfGlyphs (int startIndex, int num, const float d
 {
     jassert (startIndex >= 0);
 
-    if (dx != 0.0f || dy != 0.0f)
+    if (! approximatelyEqual (dx, 0.0f) || ! approximatelyEqual (dy, 0.0f))
     {
         if (num < 0 || startIndex + num > glyphs.size())
             num = glyphs.size() - startIndex;
@@ -540,12 +373,29 @@ void GlyphArrangement::moveRangeOfGlyphs (int startIndex, int num, const float d
     }
 }
 
+void GlyphArrangement::addLinesWithLineBreaks (const String& text, const Font& f,
+                                               float x, float y, float width, float height, Justification layout)
+{
+    GlyphArrangement ga;
+    ga.addJustifiedText (f, text, x, y, width, layout);
+
+    auto bb = ga.getBoundingBox (0, -1, false);
+    auto dy = y - bb.getY();
+
+    if (layout.testFlags (Justification::verticallyCentred))   dy += (height - bb.getHeight()) * 0.5f;
+    else if (layout.testFlags (Justification::bottom))         dy += (height - bb.getHeight());
+
+    ga.moveRangeOfGlyphs (0, -1, 0.0f, dy);
+
+    glyphs.addArray (ga.glyphs);
+}
+
 int GlyphArrangement::fitLineIntoSpace (int start, int numGlyphs, float x, float y, float w, float h, const Font& font,
                                         Justification justification, float minimumHorizontalScale)
 {
     int numDeleted = 0;
-    const float lineStartX = glyphs.getReference (start).getLeft();
-    float lineWidth = glyphs.getReference (start + numGlyphs - 1).getRight() - lineStartX;
+    auto lineStartX = glyphs.getReference (start).getLeft();
+    auto lineWidth  = glyphs.getReference (start + numGlyphs - 1).getRight() - lineStartX;
 
     if (lineWidth > w)
     {
@@ -566,8 +416,7 @@ int GlyphArrangement::fitLineIntoSpace (int start, int numGlyphs, float x, float
     return numDeleted;
 }
 
-void GlyphArrangement::stretchRangeOfGlyphs (int startIndex, int num,
-                                             const float horizontalScaleFactor)
+void GlyphArrangement::stretchRangeOfGlyphs (int startIndex, int num, float horizontalScaleFactor)
 {
     jassert (startIndex >= 0);
 
@@ -576,11 +425,11 @@ void GlyphArrangement::stretchRangeOfGlyphs (int startIndex, int num,
 
     if (num > 0)
     {
-        const float xAnchor = glyphs.getReference (startIndex).getLeft();
+        auto xAnchor = glyphs.getReference (startIndex).getLeft();
 
         while (--num >= 0)
         {
-            PositionedGlyph& pg = glyphs.getReference (startIndex++);
+            auto& pg = glyphs.getReference (startIndex++);
 
             pg.x = xAnchor + (pg.x - xAnchor) * horizontalScaleFactor;
             pg.font.setHorizontalScale (pg.font.getHorizontalScale() * horizontalScaleFactor);
@@ -589,7 +438,7 @@ void GlyphArrangement::stretchRangeOfGlyphs (int startIndex, int num,
     }
 }
 
-Rectangle<float> GlyphArrangement::getBoundingBox (int startIndex, int num, const bool includeWhitespace) const
+Rectangle<float> GlyphArrangement::getBoundingBox (int startIndex, int num, bool includeWhitespace) const
 {
     jassert (startIndex >= 0);
 
@@ -600,7 +449,7 @@ Rectangle<float> GlyphArrangement::getBoundingBox (int startIndex, int num, cons
 
     while (--num >= 0)
     {
-        const PositionedGlyph& pg = glyphs.getReference (startIndex++);
+        auto& pg = glyphs.getReference (startIndex++);
 
         if (includeWhitespace || ! pg.isWhitespace())
             result = result.getUnion (pg.getBounds());
@@ -609,40 +458,40 @@ Rectangle<float> GlyphArrangement::getBoundingBox (int startIndex, int num, cons
     return result;
 }
 
-void GlyphArrangement::justifyGlyphs (const int startIndex, const int num,
-                                      const float x, const float y, const float width, const float height,
+void GlyphArrangement::justifyGlyphs (int startIndex, int num,
+                                      float x, float y, float width, float height,
                                       Justification justification)
 {
     jassert (num >= 0 && startIndex >= 0);
 
     if (glyphs.size() > 0 && num > 0)
     {
-        const Rectangle<float> bb (getBoundingBox (startIndex, num, ! justification.testFlags (Justification::horizontallyJustified
-                                                                                                | Justification::horizontallyCentred)));
-        float deltaX = 0.0f, deltaY = 0.0f;
+        auto bb = getBoundingBox (startIndex, num, ! justification.testFlags (Justification::horizontallyJustified
+                                                                               | Justification::horizontallyCentred));
+        float deltaX = x, deltaY = y;
 
-        if (justification.testFlags (Justification::horizontallyJustified))     deltaX = x - bb.getX();
-        else if (justification.testFlags (Justification::horizontallyCentred))  deltaX = x + (width - bb.getWidth()) * 0.5f - bb.getX();
-        else if (justification.testFlags (Justification::right))                deltaX = x + width - bb.getRight();
-        else                                                                    deltaX = x - bb.getX();
+        if (justification.testFlags (Justification::horizontallyJustified))     deltaX -= bb.getX();
+        else if (justification.testFlags (Justification::horizontallyCentred))  deltaX += (width - bb.getWidth()) * 0.5f - bb.getX();
+        else if (justification.testFlags (Justification::right))                deltaX += width - bb.getRight();
+        else                                                                    deltaX -= bb.getX();
 
-        if (justification.testFlags (Justification::top))                       deltaY = y - bb.getY();
-        else if (justification.testFlags (Justification::bottom))               deltaY = y + height - bb.getBottom();
-        else                                                                    deltaY = y + (height - bb.getHeight()) * 0.5f - bb.getY();
+        if (justification.testFlags (Justification::top))                       deltaY -= bb.getY();
+        else if (justification.testFlags (Justification::bottom))               deltaY += height - bb.getBottom();
+        else                                                                    deltaY += (height - bb.getHeight()) * 0.5f - bb.getY();
 
         moveRangeOfGlyphs (startIndex, num, deltaX, deltaY);
 
         if (justification.testFlags (Justification::horizontallyJustified))
         {
             int lineStart = 0;
-            float baseY = glyphs.getReference (startIndex).getBaselineY();
+            auto baseY = glyphs.getReference (startIndex).getBaselineY();
 
             int i;
             for (i = 0; i < num; ++i)
             {
-                const float glyphY = glyphs.getReference (startIndex + i).getBaselineY();
+                auto glyphY = glyphs.getReference (startIndex + i).getBaselineY();
 
-                if (glyphY != baseY)
+                if (! approximatelyEqual (glyphY, baseY))
                 {
                     spreadOutLine (startIndex + lineStart, i - lineStart, width);
 
@@ -657,7 +506,7 @@ void GlyphArrangement::justifyGlyphs (const int startIndex, const int num,
     }
 }
 
-void GlyphArrangement::spreadOutLine (const int start, const int num, const float targetWidth)
+void GlyphArrangement::spreadOutLine (int start, int num, float targetWidth)
 {
     if (start + num < glyphs.size()
          && glyphs.getReference (start + num - 1).getCharacter() != '\r'
@@ -683,12 +532,10 @@ void GlyphArrangement::spreadOutLine (const int start, const int num, const floa
 
         if (numSpaces > 0)
         {
-            const float startX = glyphs.getReference (start).getLeft();
-            const float endX = glyphs.getReference (start + num - 1 - spacesAtEnd).getRight();
+            auto startX = glyphs.getReference (start).getLeft();
+            auto endX   = glyphs.getReference (start + num - 1 - spacesAtEnd).getRight();
 
-            const float extraPaddingBetweenWords
-                = (targetWidth - (endX - startX)) / (float) numSpaces;
-
+            auto extraPaddingBetweenWords = (targetWidth - (endX - startX)) / (float) numSpaces;
             float deltaX = 0.0f;
 
             for (int i = 0; i < num; ++i)
@@ -702,15 +549,153 @@ void GlyphArrangement::spreadOutLine (const int start, const int num, const floa
     }
 }
 
-//==============================================================================
-inline void GlyphArrangement::drawGlyphUnderline (const Graphics& g, const PositionedGlyph& pg,
-                                                  const int i, const AffineTransform& transform) const
+static bool isBreakableGlyph (const PositionedGlyph& g) noexcept
 {
-    const float lineThickness = (pg.font.getDescent()) * 0.3f;
+    return ! isNonBreakingSpace (g.getCharacter()) && (g.isWhitespace() || g.getCharacter() == '-');
+}
 
-    float nextX = pg.x + pg.w;
+void GlyphArrangement::splitLines (const String& text, Font font, int startIndex,
+                                   float x, float y, float width, float height, int maximumLines,
+                                   float lineWidth, Justification layout, float minimumHorizontalScale)
+{
+    auto length = text.length();
+    auto originalStartIndex = startIndex;
+    int numLines = 1;
 
-    if (i < glyphs.size() - 1 && glyphs.getReference (i + 1).y == pg.y)
+    if (length <= 12 && ! text.containsAnyOf (" -\t\r\n"))
+        maximumLines = 1;
+
+    maximumLines = jmin (maximumLines, length);
+
+    while (numLines < maximumLines)
+    {
+        ++numLines;
+        auto newFontHeight = height / (float) numLines;
+
+        if (newFontHeight < font.getHeight())
+        {
+            font.setHeight (jmax (8.0f, newFontHeight));
+
+            removeRangeOfGlyphs (startIndex, -1);
+            addLineOfText (font, text, x, y);
+
+            lineWidth = glyphs.getReference (glyphs.size() - 1).getRight()
+                            - glyphs.getReference (startIndex).getLeft();
+        }
+
+        // Try to estimate the point at which there are enough lines to fit the text,
+        // allowing for unevenness in the lengths due to differently sized words.
+        const float lineLengthUnevennessAllowance = 80.0f;
+
+        if ((float) numLines > (lineWidth + lineLengthUnevennessAllowance) / width || newFontHeight < 8.0f)
+            break;
+    }
+
+    if (numLines < 1)
+        numLines = 1;
+
+    int lineIndex = 0;
+    auto lineY = y;
+    auto widthPerLine = jmin (width / minimumHorizontalScale,
+                              lineWidth / (float) numLines);
+
+    while (lineY < y + height)
+    {
+        auto endIndex = startIndex;
+        auto lineStartX = glyphs.getReference (startIndex).getLeft();
+        auto lineBottomY = lineY + font.getHeight();
+
+        if (lineIndex++ >= numLines - 1
+             || lineBottomY >= y + height)
+        {
+            widthPerLine = width;
+            endIndex = glyphs.size();
+        }
+        else
+        {
+            while (endIndex < glyphs.size())
+            {
+                if (glyphs.getReference (endIndex).getRight() - lineStartX > widthPerLine)
+                {
+                    // got to a point where the line's too long, so skip forward to find a
+                    // good place to break it..
+                    auto searchStartIndex = endIndex;
+
+                    while (endIndex < glyphs.size())
+                    {
+                        auto& g = glyphs.getReference (endIndex);
+
+                        if ((g.getRight() - lineStartX) * minimumHorizontalScale < width)
+                        {
+                            if (isBreakableGlyph (g))
+                            {
+                                ++endIndex;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            // can't find a suitable break, so try looking backwards..
+                            endIndex = searchStartIndex;
+
+                            for (int back = 1; back < jmin (7, endIndex - startIndex - 1); ++back)
+                            {
+                                if (isBreakableGlyph (glyphs.getReference (endIndex - back)))
+                                {
+                                    endIndex -= back - 1;
+                                    break;
+                                }
+                            }
+
+                            break;
+                        }
+
+                        ++endIndex;
+                    }
+
+                    break;
+                }
+
+                ++endIndex;
+            }
+
+            auto wsStart = endIndex;
+            auto wsEnd   = endIndex;
+
+            while (wsStart > 0 && glyphs.getReference (wsStart - 1).isWhitespace())
+                --wsStart;
+
+            while (wsEnd < glyphs.size() && glyphs.getReference (wsEnd).isWhitespace())
+                ++wsEnd;
+
+            removeRangeOfGlyphs (wsStart, wsEnd - wsStart);
+            endIndex = jmax (wsStart, startIndex + 1);
+        }
+
+        endIndex -= fitLineIntoSpace (startIndex, endIndex - startIndex,
+                                      x, lineY, width, font.getHeight(), font,
+                                      layout.getOnlyHorizontalFlags() | Justification::verticallyCentred,
+                                      minimumHorizontalScale);
+
+        startIndex = endIndex;
+        lineY = lineBottomY;
+
+        if (startIndex >= glyphs.size())
+            break;
+    }
+
+    justifyGlyphs (originalStartIndex, glyphs.size() - originalStartIndex,
+                   x, y, width, height, layout.getFlags() & ~Justification::horizontallyJustified);
+}
+
+//==============================================================================
+void GlyphArrangement::drawGlyphUnderline (const Graphics& g, const PositionedGlyph& pg,
+                                           int i, AffineTransform transform) const
+{
+    auto lineThickness = (pg.font.getDescent()) * 0.3f;
+    auto nextX = pg.x + pg.w;
+
+    if (i < glyphs.size() - 1 && approximatelyEqual (glyphs.getReference (i + 1).y, pg.y))
         nextX = glyphs.getReference (i + 1).x;
 
     Path p;
@@ -720,37 +705,53 @@ inline void GlyphArrangement::drawGlyphUnderline (const Graphics& g, const Posit
 
 void GlyphArrangement::draw (const Graphics& g) const
 {
-    for (int i = 0; i < glyphs.size(); ++i)
-    {
-        const PositionedGlyph& pg = glyphs.getReference(i);
-
-        if (pg.font.isUnderlined())
-            drawGlyphUnderline (g, pg, i, AffineTransform::identity);
-
-        pg.draw (g);
-    }
+    draw (g, {});
 }
 
-void GlyphArrangement::draw (const Graphics& g, const AffineTransform& transform) const
+void GlyphArrangement::draw (const Graphics& g, AffineTransform transform) const
 {
+    auto& context = g.getInternalContext();
+    auto lastFont = context.getFont();
+    bool needToRestore = false;
+
     for (int i = 0; i < glyphs.size(); ++i)
     {
-        const PositionedGlyph& pg = glyphs.getReference(i);
+        auto& pg = glyphs.getReference (i);
 
         if (pg.font.isUnderlined())
             drawGlyphUnderline (g, pg, i, transform);
 
-        pg.draw (g, transform);
+        if (! pg.isWhitespace())
+        {
+            if (lastFont != pg.font)
+            {
+                lastFont = pg.font;
+
+                if (! needToRestore)
+                {
+                    needToRestore = true;
+                    context.saveState();
+                }
+
+                context.setFont (lastFont);
+            }
+
+            context.drawGlyph (pg.glyph, AffineTransform::translation (pg.x, pg.y)
+                                                         .followedBy (transform));
+        }
     }
+
+    if (needToRestore)
+        context.restoreState();
 }
 
 void GlyphArrangement::createPath (Path& path) const
 {
-    for (int i = 0; i < glyphs.size(); ++i)
-        glyphs.getReference (i).createPath (path);
+    for (auto& g : glyphs)
+        g.createPath (path);
 }
 
-int GlyphArrangement::findGlyphIndexAt (const float x, const float y) const
+int GlyphArrangement::findGlyphIndexAt (float x, float y) const
 {
     for (int i = 0; i < glyphs.size(); ++i)
         if (glyphs.getReference (i).hitTest (x, y))
@@ -758,3 +759,5 @@ int GlyphArrangement::findGlyphIndexAt (const float x, const float y) const
 
     return -1;
 }
+
+} // namespace juce

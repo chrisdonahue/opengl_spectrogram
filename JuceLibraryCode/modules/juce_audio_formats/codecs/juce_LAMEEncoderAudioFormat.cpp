@@ -2,25 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 #if JUCE_USE_LAME_AUDIO_FORMAT
 
@@ -28,22 +32,21 @@ class LAMEEncoderAudioFormat::Writer   : public AudioFormatWriter
 {
 public:
     Writer (OutputStream* destStream, const String& formatName,
-            const File& lameApp, int vbr, int cbr,
-            double sampleRate, unsigned int numberOfChannels,
-            unsigned int bitsPerSample, const StringPairArray& metadata)
-        : AudioFormatWriter (destStream, formatName, sampleRate,
-                             numberOfChannels, bitsPerSample),
-          vbrLevel (vbr), cbrBitrate (cbr),
-          tempWav (".wav")
+            const File& appFile, int vbr, int cbr,
+            double sampleRateIn, unsigned int numberOfChannels,
+            int bitsPerSampleIn, const StringPairArray& metadata)
+        : AudioFormatWriter (destStream, formatName, sampleRateIn,
+                             numberOfChannels, (unsigned int) bitsPerSampleIn),
+          vbrLevel (vbr), cbrBitrate (cbr)
     {
         WavAudioFormat wavFormat;
 
-        if (FileOutputStream* out = tempWav.getFile().createOutputStream())
+        if (auto out = tempWav.getFile().createOutputStream())
         {
-            writer = wavFormat.createWriterFor (out, sampleRate, numChannels,
-                                                bitsPerSample, metadata, 0);
+            writer.reset (wavFormat.createWriterFor (out.release(), sampleRateIn, numChannels,
+                                                     bitsPerSampleIn, metadata, 0));
 
-            args.add (lameApp.getFullPathName());
+            args.add (appFile.getFullPathName());
 
             args.add ("--quiet");
 
@@ -72,7 +75,7 @@ public:
 
     void addMetadataArg (const StringPairArray& metadata, const char* key, const char* lameFlag)
     {
-        const String value (metadata.getValue (key, String::empty));
+        auto value = metadata.getValue (key, {});
 
         if (value.isNotEmpty())
         {
@@ -99,18 +102,18 @@ public:
 
 private:
     int vbrLevel, cbrBitrate;
-    TemporaryFile tempWav;
-    ScopedPointer<AudioFormatWriter> writer;
+    TemporaryFile tempWav { ".wav" };
+    std::unique_ptr<AudioFormatWriter> writer;
     StringArray args;
 
-    bool runLameChildProcess (const TemporaryFile& tempMP3, const StringArray& args) const
+    bool runLameChildProcess (const TemporaryFile& tempMP3, const StringArray& processArgs) const
     {
         ChildProcess cp;
 
-        if (cp.start (args))
+        if (cp.start (processArgs))
         {
-            const String childOutput (cp.readAllProcessOutput());
-            DBG (childOutput); (void) childOutput;
+            [[maybe_unused]] auto childOutput = cp.readAllProcessOutput();
+            DBG (childOutput);
 
             cp.waitForProcessToFinish (10000);
             return tempMP3.getFile().getSize() > 0;
@@ -164,14 +167,12 @@ bool LAMEEncoderAudioFormat::canHandleFile (const File&)
 
 Array<int> LAMEEncoderAudioFormat::getPossibleSampleRates()
 {
-    const int rates[] = { 32000, 44100, 48000, 0 };
-    return Array <int> (rates);
+    return { 32000, 44100, 48000 };
 }
 
 Array<int> LAMEEncoderAudioFormat::getPossibleBitDepths()
 {
-    const int depths[] = { 16, 0 };
-    return Array <int> (depths);
+    return { 16 };
 }
 
 bool LAMEEncoderAudioFormat::canDoStereo()      { return true; }
@@ -205,6 +206,9 @@ AudioFormatWriter* LAMEEncoderAudioFormat::createWriterFor (OutputStream* stream
                                                             const StringPairArray& metadataValues,
                                                             int qualityOptionIndex)
 {
+    if (streamToWriteTo == nullptr)
+        return nullptr;
+
     int vbr = 4;
     int cbr = 0;
 
@@ -220,3 +224,5 @@ AudioFormatWriter* LAMEEncoderAudioFormat::createWriterFor (OutputStream* stream
 }
 
 #endif
+
+} // namespace juce

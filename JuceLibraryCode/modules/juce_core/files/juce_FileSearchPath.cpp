@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-FileSearchPath::FileSearchPath() {}
-FileSearchPath::~FileSearchPath() {}
+namespace juce
+{
 
 FileSearchPath::FileSearchPath (const String& path)
 {
@@ -58,8 +52,8 @@ void FileSearchPath::init (const String& path)
     directories.trim();
     directories.removeEmptyStrings();
 
-    for (int i = directories.size(); --i >= 0;)
-        directories.set (i, directories[i].unquoted());
+    for (auto& d : directories)
+        d = d.unquoted();
 }
 
 int FileSearchPath::getNumPaths() const
@@ -67,36 +61,48 @@ int FileSearchPath::getNumPaths() const
     return directories.size();
 }
 
-File FileSearchPath::operator[] (const int index) const
+File FileSearchPath::operator[] (int index) const
 {
-    return File (directories [index]);
+    return File (getRawString (index));
+}
+
+String FileSearchPath::getRawString (int index) const
+{
+    return directories[index];
 }
 
 String FileSearchPath::toString() const
 {
-    StringArray directories2 (directories);
-    for (int i = directories2.size(); --i >= 0;)
-        if (directories2[i].containsChar (';'))
-            directories2.set (i, directories2[i].quoted());
-
-    return directories2.joinIntoString (";");
+    return toStringWithSeparator (";");
 }
 
-void FileSearchPath::add (const File& dir, const int insertIndex)
+String FileSearchPath::toStringWithSeparator (StringRef separator) const
+{
+    auto dirs = directories;
+
+    for (auto& d : dirs)
+        if (d.contains (separator))
+            d = d.quoted();
+
+    return dirs.joinIntoString (separator);
+}
+
+void FileSearchPath::add (const File& dir, int insertIndex)
 {
     directories.insert (insertIndex, dir.getFullPathName());
 }
 
-void FileSearchPath::addIfNotAlreadyThere (const File& dir)
+bool FileSearchPath::addIfNotAlreadyThere (const File& dir)
 {
-    for (int i = 0; i < directories.size(); ++i)
-        if (File (directories[i]) == dir)
-            return;
+    for (auto& d : directories)
+        if (File (d) == dir)
+            return false;
 
     add (dir);
+    return true;
 }
 
-void FileSearchPath::remove (const int index)
+void FileSearchPath::remove (int index)
 {
     directories.remove (index);
 }
@@ -109,21 +115,30 @@ void FileSearchPath::addPath (const FileSearchPath& other)
 
 void FileSearchPath::removeRedundantPaths()
 {
-    for (int i = directories.size(); --i >= 0;)
+    std::vector<String> reduced;
+
+    for (const auto& directory : directories)
     {
-        const File d1 (directories[i]);
-
-        for (int j = directories.size(); --j >= 0;)
+        const auto checkedIsChildOf = [&] (const auto& a, const auto& b)
         {
-            const File d2 (directories[j]);
+            return File::isAbsolutePath (a) && File::isAbsolutePath (b) && File (a).isAChildOf (b);
+        };
 
-            if ((i != j) && (d1.isAChildOf (d2) || d1 == d2))
-            {
-                directories.remove (i);
-                break;
-            }
-        }
+        const auto fContainsDirectory = [&] (const auto& f)
+        {
+            return f == directory || checkedIsChildOf (directory, f);
+        };
+
+        if (std::find_if (reduced.begin(), reduced.end(), fContainsDirectory) != reduced.end())
+            continue;
+
+        const auto directoryContainsF = [&] (const auto& f) { return checkedIsChildOf (f, directory); };
+
+        reduced.erase (std::remove_if (reduced.begin(), reduced.end(), directoryContainsF), reduced.end());
+        reduced.push_back (directory);
     }
+
+    directories = StringArray (reduced.data(), (int) reduced.size());
 }
 
 void FileSearchPath::removeNonExistentPaths()
@@ -133,18 +148,20 @@ void FileSearchPath::removeNonExistentPaths()
             directories.remove (i);
 }
 
-int FileSearchPath::findChildFiles (Array<File>& results,
-                                    const int whatToLookFor,
-                                    const bool searchRecursively,
-                                    const String& wildCardPattern) const
+Array<File> FileSearchPath::findChildFiles (int whatToLookFor, bool recurse, const String& wildcard) const
+{
+    Array<File> results;
+    findChildFiles (results, whatToLookFor, recurse, wildcard);
+    return results;
+}
+
+int FileSearchPath::findChildFiles (Array<File>& results, int whatToLookFor,
+                                    bool recurse, const String& wildcard) const
 {
     int total = 0;
 
-    for (int i = 0; i < directories.size(); ++i)
-        total += operator[] (i).findChildFiles (results,
-                                                whatToLookFor,
-                                                searchRecursively,
-                                                wildCardPattern);
+    for (auto& d : directories)
+        total += File (d).findChildFiles (results, whatToLookFor, recurse, wildcard);
 
     return total;
 }
@@ -152,21 +169,71 @@ int FileSearchPath::findChildFiles (Array<File>& results,
 bool FileSearchPath::isFileInPath (const File& fileToCheck,
                                    const bool checkRecursively) const
 {
-    for (int i = directories.size(); --i >= 0;)
+    for (auto& d : directories)
     {
-        const File d (directories[i]);
-
         if (checkRecursively)
         {
-            if (fileToCheck.isAChildOf (d))
+            if (fileToCheck.isAChildOf (File (d)))
                 return true;
         }
         else
         {
-            if (fileToCheck.getParentDirectory() == d)
+            if (fileToCheck.getParentDirectory() == File (d))
                 return true;
         }
     }
 
     return false;
 }
+
+//==============================================================================
+//==============================================================================
+#if JUCE_UNIT_TESTS
+
+class FileSearchPathTests : public UnitTest
+{
+public:
+    FileSearchPathTests() : UnitTest ("FileSearchPath", UnitTestCategories::files) {}
+
+    void runTest() override
+    {
+        beginTest ("removeRedundantPaths");
+        {
+           #if JUCE_WINDOWS
+            const String prefix = "C:";
+           #else
+            const String prefix = "";
+           #endif
+
+            {
+                FileSearchPath fsp { prefix + "/a/b/c/d;" + prefix + "/a/b/c/e;" + prefix + "/a/b/c" };
+                fsp.removeRedundantPaths();
+                expectEquals (fsp.toString(), prefix + "/a/b/c");
+            }
+
+            {
+                FileSearchPath fsp { prefix + "/a/b/c;" + prefix + "/a/b/c/d;" + prefix + "/a/b/c/e" };
+                fsp.removeRedundantPaths();
+                expectEquals (fsp.toString(), prefix + "/a/b/c");
+            }
+
+            {
+                FileSearchPath fsp { prefix + "/a/b/c/d;" + prefix + "/a/b/c;" + prefix + "/a/b/c/e" };
+                fsp.removeRedundantPaths();
+                expectEquals (fsp.toString(), prefix + "/a/b/c");
+            }
+
+            {
+                FileSearchPath fsp { "%FOO%;" + prefix + "/a/b/c;%FOO%;" + prefix + "/a/b/c/d" };
+                fsp.removeRedundantPaths();
+                expectEquals (fsp.toString(), "%FOO%;" + prefix + "/a/b/c");
+            }
+        }
+    }
+};
+
+static FileSearchPathTests fileSearchPathTests;
+
+#endif
+
+} // namespace juce

@@ -2,25 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 // this will throw an assertion if you try to draw something that's not
 // possible in postscript
@@ -46,12 +50,12 @@ LowLevelGraphicsPostScriptRenderer::LowLevelGraphicsPostScriptRenderer (OutputSt
     stateStack.add (new SavedState());
     stateStack.getLast()->clip = Rectangle<int> (totalWidth_, totalHeight_);
 
-    const float scale = jmin ((520.0f / totalWidth_), (750.0f / totalHeight));
+    const float scale = jmin ((520.0f / (float) totalWidth_), (750.0f / (float) totalHeight));
 
     out << "%!PS-Adobe-3.0 EPSF-3.0"
            "\n%%BoundingBox: 0 0 600 824"
            "\n%%Pages: 0"
-           "\n%%Creator: Raw Material Software JUCE"
+           "\n%%Creator: Raw Material Software Limited - JUCE"
            "\n%%Title: " << documentTitle <<
            "\n%%CreationDate: none"
            "\n%%LanguageLevel: 2"
@@ -77,10 +81,6 @@ LowLevelGraphicsPostScriptRenderer::LowLevelGraphicsPostScriptRenderer (OutputSt
            "\n%%EndPageSetup\n\n"
         << "40 800 translate\n"
         << scale << ' ' << scale << " scale\n\n";
-}
-
-LowLevelGraphicsPostScriptRenderer::~LowLevelGraphicsPostScriptRenderer()
-{
 }
 
 //==============================================================================
@@ -164,10 +164,6 @@ LowLevelGraphicsPostScriptRenderer::SavedState::SavedState()
 {
 }
 
-LowLevelGraphicsPostScriptRenderer::SavedState::~SavedState()
-{
-}
-
 void LowLevelGraphicsPostScriptRenderer::saveState()
 {
     stateStack.add (new SavedState (*stateStack.getLast()));
@@ -200,7 +196,7 @@ void LowLevelGraphicsPostScriptRenderer::writeClip()
 
         int itemsOnLine = 0;
 
-        for (const Rectangle<int>* i = stateStack.getLast()->clip.begin(), * const e = stateStack.getLast()->clip.end(); i != e; ++i)
+        for (auto& i : stateStack.getLast()->clip)
         {
             if (++itemsOnLine == 6)
             {
@@ -208,8 +204,8 @@ void LowLevelGraphicsPostScriptRenderer::writeClip()
                 out << '\n';
             }
 
-            out << i->getX() << ' ' << -i->getY() << ' '
-                << i->getWidth() << ' ' << -i->getHeight() << " pr ";
+            out << i.getX() << ' ' << -i.getY() << ' '
+                << i.getWidth() << ' ' << -i.getHeight() << " pr ";
         }
 
         out << "endclip\n";
@@ -346,8 +342,8 @@ void LowLevelGraphicsPostScriptRenderer::fillRect (const Rectangle<float>& r)
         writeClip();
         writeColour (stateStack.getLast()->fillType.colour);
 
-        Rectangle<float> r2 (r.translated ((float) stateStack.getLast()->xOffset,
-                                           (float) stateStack.getLast()->yOffset));
+        auto r2 = r.translated ((float) stateStack.getLast()->xOffset,
+                                (float) stateStack.getLast()->yOffset);
 
         out << r2.getX() << ' ' << -r2.getBottom() << ' ' << r2.getWidth() << ' ' << r2.getHeight() << " rectfill\n";
     }
@@ -355,13 +351,13 @@ void LowLevelGraphicsPostScriptRenderer::fillRect (const Rectangle<float>& r)
     {
         Path p;
         p.addRectangle (r);
-        fillPath (p, AffineTransform::identity);
+        fillPath (p, AffineTransform());
     }
 }
 
 void LowLevelGraphicsPostScriptRenderer::fillRectList (const RectangleList<float>& list)
 {
-    fillPath (list.toPath(), AffineTransform::identity);
+    fillPath (list.toPath(), AffineTransform());
 }
 
 //==============================================================================
@@ -384,7 +380,7 @@ void LowLevelGraphicsPostScriptRenderer::fillPath (const Path& path, const Affin
     {
         // this doesn't work correctly yet - it could be improved to handle solid gradients, but
         // postscript can't do semi-transparent ones.
-        notPossibleInPostscriptAssert   // you can disable this warning by setting the WARN_ABOUT_NON_POSTSCRIPT_OPERATIONS flag at the top of this file
+        notPossibleInPostscriptAssert;   // you can disable this warning by setting the WARN_ABOUT_NON_POSTSCRIPT_OPERATIONS flag at the top of this file
 
         writeClip();
         out << "gsave ";
@@ -396,7 +392,7 @@ void LowLevelGraphicsPostScriptRenderer::fillPath (const Path& path, const Affin
             out << "clip\n";
         }
 
-        const Rectangle<int> bounds (stateStack.getLast()->clip.getBounds());
+        auto bounds = stateStack.getLast()->clip.getBounds();
 
         // ideally this would draw lots of lines or ellipses to approximate the gradient, but for the
         // time-being, this just fills it with the average colour..
@@ -433,11 +429,11 @@ void LowLevelGraphicsPostScriptRenderer::writeImage (const Image& im,
                 {
                     PixelARGB p (*(const PixelARGB*) pixelData);
                     p.unpremultiply();
-                    pixel = Colours::white.overlaidWith (Colour (p.getARGB()));
+                    pixel = Colours::white.overlaidWith (Colour (p));
                 }
                 else if (im.isRGB())
                 {
-                    pixel = Colour (((const PixelRGB*) pixelData)->getARGB());
+                    pixel = Colour (*((const PixelRGB*) pixelData));
                 }
                 else
                 {
@@ -482,7 +478,7 @@ void LowLevelGraphicsPostScriptRenderer::drawImage (const Image& sourceImage, co
     out << "newpath ";
     int itemsOnLine = 0;
 
-    for (const Rectangle<int>* i = imageClip.begin(), * const e = imageClip.end(); i != e; ++i)
+    for (auto& i : imageClip)
     {
         if (++itemsOnLine == 6)
         {
@@ -490,7 +486,7 @@ void LowLevelGraphicsPostScriptRenderer::drawImage (const Image& sourceImage, co
             itemsOnLine = 0;
         }
 
-        out << i->getX() << ' ' << i->getY() << ' ' << i->getWidth() << ' ' << i->getHeight() << " pr ";
+        out << i.getX() << ' ' << i.getY() << ' ' << i.getWidth() << ' ' << i.getHeight() << " pr ";
     }
 
     out << " clip newpath\n";
@@ -510,7 +506,7 @@ void LowLevelGraphicsPostScriptRenderer::drawLine (const Line <float>& line)
 {
     Path p;
     p.addLineSegment (line, 1.0f);
-    fillPath (p, AffineTransform::identity);
+    fillPath (p, AffineTransform());
 }
 
 //==============================================================================
@@ -528,6 +524,8 @@ void LowLevelGraphicsPostScriptRenderer::drawGlyph (int glyphNumber, const Affin
 {
     Path p;
     Font& font = stateStack.getLast()->font;
-    font.getTypeface()->getOutlineForGlyph (glyphNumber, p);
+    font.getTypefacePtr()->getOutlineForGlyph (glyphNumber, p);
     fillPath (p, AffineTransform::scale (font.getHeight() * font.getHorizontalScale(), font.getHeight()).followedBy (transform));
 }
+
+} // namespace juce

@@ -33,8 +33,8 @@ spectrogram_component::spectrogram_component ()
     fft_size_selector->setTooltip ("size of FFT");
     fft_size_selector->setEditableText (false);
     fft_size_selector->setJustificationType (Justification::centredLeft);
-    fft_size_selector->setTextWhenNothingSelected (String::empty);
-    fft_size_selector->setTextWhenNoChoicesAvailable (String::empty);
+    fft_size_selector->setTextWhenNothingSelected (juce::String());
+    fft_size_selector->setTextWhenNoChoicesAvailable (juce::String());
     fft_size_selector->addItem ("128", 1);
     fft_size_selector->addItem ("256", 2);
     fft_size_selector->addItem ("512", 3);
@@ -58,8 +58,8 @@ spectrogram_component::spectrogram_component ()
     fft_window_selector->setTooltip ("window for FFT");
     fft_window_selector->setEditableText (false);
     fft_window_selector->setJustificationType (Justification::centredLeft);
-    fft_window_selector->setTextWhenNothingSelected (String::empty);
-    fft_window_selector->setTextWhenNoChoicesAvailable (String::empty);
+    fft_window_selector->setTextWhenNothingSelected (String());
+    fft_window_selector->setTextWhenNoChoicesAvailable (String());
     fft_window_selector->addItem ("rectangle", 1);
     fft_window_selector->addItem ("hanning", 2);
     fft_window_selector->addListener (this);
@@ -98,8 +98,8 @@ spectrogram_component::spectrogram_component ()
     shader_selector->setTooltip ("shader type");
     shader_selector->setEditableText (false);
     shader_selector->setJustificationType (Justification::centredLeft);
-    shader_selector->setTextWhenNothingSelected (String::empty);
-    shader_selector->setTextWhenNoChoicesAvailable (String::empty);
+    shader_selector->setTextWhenNothingSelected (String());
+    shader_selector->setTextWhenNoChoicesAvailable (String());
     shader_selector->addListener (this);
 
     addAndMakeVisible (shader_label = new Label ("shader label",
@@ -125,7 +125,7 @@ spectrogram_component::spectrogram_component ()
     load_button->addListener (this);
 
     addAndMakeVisible (play_button = new ImageButton ("play button"));
-    play_button->setButtonText (String::empty);
+    play_button->setButtonText (String());
     play_button->addListener (this);
 
     play_button->setImages (false, true, true,
@@ -133,7 +133,7 @@ spectrogram_component::spectrogram_component ()
                             ImageCache::getFromMemory (button_hover_play_png, button_hover_play_pngSize), 1.000f, Colour (0x00000000),
                             ImageCache::getFromMemory (button_down_play_png, button_down_play_pngSize), 1.000f, Colour (0x00000000));
     addAndMakeVisible (pause_button = new ImageButton ("pause button"));
-    pause_button->setButtonText (String::empty);
+    pause_button->setButtonText (String());
     pause_button->addListener (this);
 
     pause_button->setImages (false, true, true,
@@ -141,7 +141,7 @@ spectrogram_component::spectrogram_component ()
                              ImageCache::getFromMemory (button_hover_pause_png, button_hover_pause_pngSize), 1.000f, Colour (0x00000000),
                              ImageCache::getFromMemory (button_down_pause_png, button_down_pause_pngSize), 1.000f, Colour (0x00000000));
     addAndMakeVisible (stop_button = new ImageButton ("stop button"));
-    stop_button->setButtonText (String::empty);
+    stop_button->setButtonText (String());
     stop_button->addListener (this);
 
     stop_button->setImages (false, true, true,

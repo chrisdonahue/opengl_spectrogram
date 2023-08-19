@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_PLUGINDESCRIPTION_H_INCLUDED
-#define JUCE_PLUGINDESCRIPTION_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -36,15 +36,20 @@
     A KnownPluginList contains a list of PluginDescription objects.
 
     @see KnownPluginList
+
+    @tags{Audio}
 */
 class JUCE_API  PluginDescription
 {
 public:
     //==============================================================================
-    PluginDescription();
-    PluginDescription (const PluginDescription& other);
-    PluginDescription& operator= (const PluginDescription& other);
-    ~PluginDescription();
+    PluginDescription() = default;
+
+    PluginDescription (const PluginDescription&) = default;
+    PluginDescription (PluginDescription&&) = default;
+
+    PluginDescription& operator= (const PluginDescription&) = default;
+    PluginDescription& operator= (PluginDescription&&) = default;
 
     //==============================================================================
     /** The name of the plug-in. */
@@ -81,33 +86,66 @@ public:
     */
     Time lastFileModTime;
 
-    /** A unique ID for the plug-in.
+    /** The last time that this information was updated. This would typically have
+        been during a scan when this plugin was first tested or found to have changed.
+    */
+    Time lastInfoUpdateTime;
+
+    /** Deprecated: New projects should use uniqueId instead.
+
+        A unique ID for the plug-in.
 
         Note that this might not be unique between formats, e.g. a VST and some
         other format might actually have the same id.
 
         @see createIdentifierString
     */
-    int uid;
+    int deprecatedUid = 0;
+
+    /** A unique ID for the plug-in.
+
+        Note that this might not be unique between formats, e.g. a VST and some
+        other format might actually have the same id.
+
+        The uniqueId field replaces the deprecatedUid field, and fixes an issue
+        where VST3 plugins with matching FUIDs would generate different uid
+        values depending on the platform. The deprecatedUid field is kept for
+        backwards compatibility, allowing existing hosts to migrate from the
+        old uid to the new uniqueId.
+
+        @see createIdentifierString
+    */
+    int uniqueId = 0;
 
     /** True if the plug-in identifies itself as a synthesiser. */
-    bool isInstrument;
+    bool isInstrument = false;
 
     /** The number of inputs. */
-    int numInputChannels;
+    int numInputChannels = 0;
 
     /** The number of outputs. */
-    int numOutputChannels;
+    int numOutputChannels = 0;
 
     /** True if the plug-in is part of a multi-type container, e.g. a VST Shell. */
-    bool hasSharedContainer;
+    bool hasSharedContainer = false;
 
-    /** Returns true if the two descriptions refer the the same plug-in.
+    /** True if the plug-in is ARA enabled and can supply a valid ARAFactoryWrapper. */
+    bool hasARAExtension = false;
+
+    /** Returns true if the two descriptions refer to the same plug-in.
 
         This isn't quite as simple as them just having the same file (because of
         shell plug-ins).
     */
-    bool isDuplicateOf (const PluginDescription& other) const;
+    bool isDuplicateOf (const PluginDescription& other) const noexcept;
+
+    /** Return true if this description is equivalent to another one which created the
+        given identifier string.
+
+        Note that this isn't quite as simple as them just calling createIdentifierString()
+        and comparing the strings, because the identifiers can differ (thanks to shell plug-ins).
+    */
+    bool matchesIdentifierString (const String& identifierString) const;
 
     //==============================================================================
     /** Returns a string that can be saved and used to uniquely identify the
@@ -124,7 +162,7 @@ public:
 
         @see loadFromXml
     */
-    XmlElement* createXml() const;
+    std::unique_ptr<XmlElement> createXml() const;
 
     /** Reloads the info in this structure from an XML record that was previously
         saved with createXML().
@@ -139,5 +177,4 @@ private:
     JUCE_LEAK_DETECTOR (PluginDescription)
 };
 
-
-#endif   // JUCE_PLUGINDESCRIPTION_H_INCLUDED
+} // namespace juce

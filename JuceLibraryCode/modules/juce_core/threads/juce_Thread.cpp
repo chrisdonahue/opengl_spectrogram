@@ -1,43 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-Thread::Thread (const String& threadName_)
-    : threadName (threadName_),
-      threadHandle (nullptr),
-      threadId (0),
-      threadPriority (5),
-      affinityMask (0),
-      shouldExit (false)
+namespace juce
+{
+//==============================================================================
+Thread::Thread (const String& name, size_t stackSize) : threadName (name),
+                                                        threadStackSize (stackSize)
 {
 }
 
 Thread::~Thread()
 {
+    if (deleteOnThreadEnd)
+        return;
+
     /* If your thread class's destructor has been called without first stopping the thread, that
        means that this partially destructed object is still performing some work - and that's
        probably a Bad Thing!
@@ -57,7 +52,7 @@ struct CurrentThreadHolder   : public ReferenceCountedObject
 {
     CurrentThreadHolder() noexcept {}
 
-    typedef ReferenceCountedObjectPtr <CurrentThreadHolder> Ptr;
+    using Ptr = ReferenceCountedObjectPtr<CurrentThreadHolder>;
     ThreadLocalValue<Thread*> value;
 
     JUCE_DECLARE_NON_COPYABLE (CurrentThreadHolder)
@@ -86,61 +81,100 @@ void Thread::threadEntryPoint()
     const CurrentThreadHolder::Ptr currentThreadHolder (getCurrentThreadHolder());
     currentThreadHolder->value = this;
 
-    JUCE_TRY
+    if (threadName.isNotEmpty())
+        setCurrentThreadName (threadName);
+
+    // This 'startSuspensionEvent' protects 'threadId' which is initialised after the platform's native 'CreateThread' method.
+    // This ensures it has been initialised correctly before it reaches this point.
+    if (startSuspensionEvent.wait (10000))
     {
-        if (threadName.isNotEmpty())
-            setCurrentThreadName (threadName);
+        jassert (getCurrentThreadId() == threadId);
 
-        if (startSuspensionEvent.wait (10000))
+        if (affinityMask != 0)
+            setCurrentThreadAffinityMask (affinityMask);
+
+        try
         {
-            jassert (getCurrentThreadId() == threadId);
-
-            if (affinityMask != 0)
-                setCurrentThreadAffinityMask (affinityMask);
-
             run();
         }
+        catch (...)
+        {
+            jassertfalse; // Your run() method mustn't throw any exceptions!
+        }
     }
-    JUCE_CATCH_ALL_ASSERT
 
     currentThreadHolder->value.releaseCurrentThreadStorage();
+
+    // Once closeThreadHandle is called this class may be deleted by a different
+    // thread, so we need to store deleteOnThreadEnd in a local variable.
+    auto shouldDeleteThis = deleteOnThreadEnd;
     closeThreadHandle();
+
+    if (shouldDeleteThis)
+        delete this;
 }
 
 // used to wrap the incoming call from the platform-specific code
 void JUCE_API juce_threadEntryPoint (void* userData)
 {
-    static_cast <Thread*> (userData)->threadEntryPoint();
+    static_cast<Thread*> (userData)->threadEntryPoint();
 }
 
 //==============================================================================
-void Thread::startThread()
+bool Thread::startThreadInternal (Priority threadPriority)
 {
-    const ScopedLock sl (startStopLock);
-
     shouldExit = false;
 
-    if (threadHandle == nullptr)
+    // 'priority' is essentially useless on Linux as only realtime
+    // has any options but we need to set this here to satisfy
+    // later queries, otherwise we get inconsistent results across
+    // platforms.
+   #if JUCE_ANDROID || JUCE_LINUX || JUCE_BSD
+    priority = threadPriority;
+   #endif
+
+    if (createNativeThread (threadPriority))
     {
-        launchThread();
-        setThreadPriority (threadHandle, threadPriority);
         startSuspensionEvent.signal();
+        return true;
     }
+
+    return false;
 }
 
-void Thread::startThread (const int priority)
+bool Thread::startThread()
+{
+    return startThread (Priority::normal);
+}
+
+bool Thread::startThread (Priority threadPriority)
 {
     const ScopedLock sl (startStopLock);
 
     if (threadHandle == nullptr)
     {
-        threadPriority = priority;
-        startThread();
+        realtimeOptions.reset();
+        return startThreadInternal (threadPriority);
     }
-    else
+
+    return false;
+}
+
+bool Thread::startRealtimeThread (const RealtimeOptions& options)
+{
+    const ScopedLock sl (startStopLock);
+
+    if (threadHandle == nullptr)
     {
-        setPriority (priority);
+        realtimeOptions = std::make_optional (options);
+
+        if (startThreadInternal (Priority::normal))
+            return true;
+
+        realtimeOptions.reset();
     }
+
+    return false;
 }
 
 bool Thread::isThreadRunning() const
@@ -153,18 +187,37 @@ Thread* JUCE_CALLTYPE Thread::getCurrentThread()
     return getCurrentThreadHolder()->value.get();
 }
 
+Thread::ThreadID Thread::getThreadId() const noexcept
+{
+    return threadId;
+}
+
 //==============================================================================
 void Thread::signalThreadShouldExit()
 {
     shouldExit = true;
+    listeners.call ([] (Listener& l) { l.exitSignalSent(); });
+}
+
+bool Thread::threadShouldExit() const
+{
+    return shouldExit;
+}
+
+bool Thread::currentThreadShouldExit()
+{
+    if (auto* currentThread = getCurrentThread())
+        return currentThread->threadShouldExit();
+
+    return false;
 }
 
 bool Thread::waitForThreadToExit (const int timeOutMilliseconds) const
 {
     // Doh! So how exactly do you expect this thread to wait for itself to stop??
-    jassert (getThreadId() != getCurrentThreadId() || getCurrentThreadId() == 0);
+    jassert (getThreadId() != getCurrentThreadId() || getCurrentThreadId() == ThreadID());
 
-    const uint32 timeoutEnd = Time::getMillisecondCounter() + (uint32) timeOutMilliseconds;
+    auto timeoutEnd = Time::getMillisecondCounter() + (uint32) timeOutMilliseconds;
 
     while (isThreadRunning())
     {
@@ -203,7 +256,7 @@ bool Thread::stopThread (const int timeOutMilliseconds)
             killThread();
 
             threadHandle = nullptr;
-            threadId = 0;
+            threadId = {};
             return false;
         }
     }
@@ -211,28 +264,19 @@ bool Thread::stopThread (const int timeOutMilliseconds)
     return true;
 }
 
-//==============================================================================
-bool Thread::setPriority (const int newPriority)
+void Thread::addListener (Listener* listener)
 {
-    // NB: deadlock possible if you try to set the thread prio from the thread itself,
-    // so using setCurrentThreadPriority instead in that case.
-    if (getCurrentThreadId() == getThreadId())
-        return setCurrentThreadPriority (newPriority);
-
-    const ScopedLock sl (startStopLock);
-
-    if (setThreadPriority (threadHandle, newPriority))
-    {
-        threadPriority = newPriority;
-        return true;
-    }
-
-    return false;
+    listeners.add (listener);
 }
 
-bool Thread::setCurrentThreadPriority (const int newPriority)
+void Thread::removeListener (Listener* listener)
 {
-    return setThreadPriority (0, newPriority);
+    listeners.remove (listener);
+}
+
+bool Thread::isRealtime() const
+{
+    return realtimeOptions.has_value();
 }
 
 void Thread::setAffinityMask (const uint32 newAffinityMask)
@@ -241,7 +285,7 @@ void Thread::setAffinityMask (const uint32 newAffinityMask)
 }
 
 //==============================================================================
-bool Thread::wait (const int timeOutMilliseconds) const
+bool Thread::wait (double timeOutMilliseconds) const
 {
     return defaultEvent.wait (timeOutMilliseconds);
 }
@@ -249,6 +293,41 @@ bool Thread::wait (const int timeOutMilliseconds) const
 void Thread::notify() const
 {
     defaultEvent.signal();
+}
+
+//==============================================================================
+struct LambdaThread  : public Thread
+{
+    LambdaThread (std::function<void()>&& f) : Thread ("anonymous"), fn (std::move (f)) {}
+
+    void run() override
+    {
+        fn();
+        fn = nullptr; // free any objects that the lambda might contain while the thread is still active
+    }
+
+    std::function<void()> fn;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LambdaThread)
+};
+
+bool Thread::launch (std::function<void()> functionToRun)
+{
+    return launch (Priority::normal, std::move (functionToRun));
+}
+
+bool Thread::launch (Priority priority, std::function<void()> functionToRun)
+{
+    auto anon = std::make_unique<LambdaThread> (std::move (functionToRun));
+    anon->deleteOnThreadEnd = true;
+
+    if (anon->startThread (priority))
+    {
+        anon.release();
+        return true;
+    }
+
+    return false;
 }
 
 //==============================================================================
@@ -266,14 +345,23 @@ void SpinLock::enter() const noexcept
 }
 
 //==============================================================================
+bool JUCE_CALLTYPE Process::isRunningUnderDebugger() noexcept
+{
+    return juce_isRunningUnderDebugger();
+}
+
+//==============================================================================
+//==============================================================================
 #if JUCE_UNIT_TESTS
 
 class AtomicTests  : public UnitTest
 {
 public:
-    AtomicTests() : UnitTest ("Atomics") {}
+    AtomicTests()
+        : UnitTest ("Atomics", UnitTestCategories::threads)
+    {}
 
-    void runTest()
+    void runTest() override
     {
         beginTest ("Misc");
 
@@ -284,7 +372,7 @@ public:
 
         expect (ByteOrder::swap ((uint16) 0x1122) == 0x2211);
         expect (ByteOrder::swap ((uint32) 0x11223344) == 0x44332211);
-        expect (ByteOrder::swap ((uint64) 0x1122334455667788ULL) == 0x8877665544332211LL);
+        expect (ByteOrder::swap ((uint64) 0x1122334455667788ULL) == (uint64) 0x8877665544332211LL);
 
         beginTest ("Atomic int");
         AtomicTester <int>::testInteger (*this);
@@ -296,8 +384,6 @@ public:
         AtomicTester <uint32>::testInteger (*this);
         beginTest ("Atomic long");
         AtomicTester <long>::testInteger (*this);
-        beginTest ("Atomic void*");
-        AtomicTester <void*>::testInteger (*this);
         beginTest ("Atomic int*");
         AtomicTester <int*>::testInteger (*this);
         beginTest ("Atomic float");
@@ -310,62 +396,144 @@ public:
         beginTest ("Atomic double");
         AtomicTester <double>::testFloat (*this);
       #endif
+        beginTest ("Atomic pointer increment/decrement");
+        Atomic<int*> a (a2); int* b (a2);
+        expect (++a == ++b);
+
+        {
+            beginTest ("Atomic void*");
+            Atomic<void*> atomic;
+            void* c;
+
+            atomic.set ((void*) 10);
+            c = (void*) 10;
+
+            expect (atomic.value == c);
+            expect (atomic.get() == c);
+        }
     }
 
     template <typename Type>
     class AtomicTester
     {
     public:
-        AtomicTester() {}
+        AtomicTester() = default;
 
         static void testInteger (UnitTest& test)
         {
             Atomic<Type> a, b;
+            Type c;
+
             a.set ((Type) 10);
-            test.expect (a.value == (Type) 10);
-            test.expect (a.get() == (Type) 10);
-            a += (Type) 15;
-            test.expect (a.get() == (Type) 25);
+            c = (Type) 10;
+
+            test.expect (a.value == c);
+            test.expect (a.get() == c);
+
+            a += 15;
+            c += 15;
+            test.expect (a.get() == c);
             a.memoryBarrier();
-            a -= (Type) 5;
-            test.expect (a.get() == (Type) 20);
-            test.expect (++a == (Type) 21);
+
+            a -= 5;
+            c -= 5;
+            test.expect (a.get() == c);
+
+            test.expect (++a == ++c);
             ++a;
-            test.expect (--a == (Type) 21);
-            test.expect (a.get() == (Type) 21);
+            ++c;
+            test.expect (--a == --c);
+            test.expect (a.get() == c);
             a.memoryBarrier();
 
             testFloat (test);
         }
 
+
+
         static void testFloat (UnitTest& test)
         {
             Atomic<Type> a, b;
-            a = (Type) 21;
+            a = (Type) 101;
             a.memoryBarrier();
 
             /*  These are some simple test cases to check the atomics - let me know
                 if any of these assertions fail on your system!
             */
-            test.expect (a.get() == (Type) 21);
-            test.expect (a.compareAndSetValue ((Type) 100, (Type) 50) == (Type) 21);
-            test.expect (a.get() == (Type) 21);
-            test.expect (a.compareAndSetValue ((Type) 101, a.get()) == (Type) 21);
-            test.expect (a.get() == (Type) 101);
+            test.expect (exactlyEqual (a.get(), (Type) 101));
             test.expect (! a.compareAndSetBool ((Type) 300, (Type) 200));
-            test.expect (a.get() == (Type) 101);
+            test.expect (exactlyEqual (a.get(), (Type) 101));
             test.expect (a.compareAndSetBool ((Type) 200, a.get()));
-            test.expect (a.get() == (Type) 200);
+            test.expect (exactlyEqual (a.get(), (Type) 200));
 
-            test.expect (a.exchange ((Type) 300) == (Type) 200);
-            test.expect (a.get() == (Type) 300);
+            test.expect (exactlyEqual (a.exchange ((Type) 300), (Type) 200));
+            test.expect (exactlyEqual (a.get(), (Type) 300));
 
             b = a;
-            test.expect (b.get() == a.get());
+            test.expect (exactlyEqual (b.get(), a.get()));
         }
     };
 };
 
 static AtomicTests atomicUnitTests;
 
+//==============================================================================
+class ThreadLocalValueUnitTest  : public UnitTest,
+                                  private Thread
+{
+public:
+    ThreadLocalValueUnitTest()
+        : UnitTest ("ThreadLocalValue", UnitTestCategories::threads),
+          Thread ("ThreadLocalValue Thread")
+    {}
+
+    void runTest() override
+    {
+        beginTest ("values are thread local");
+
+        {
+            ThreadLocalValue<int> threadLocal;
+
+            sharedThreadLocal = &threadLocal;
+
+            sharedThreadLocal.get()->get() = 1;
+
+            startThread();
+            signalThreadShouldExit();
+            waitForThreadToExit (-1);
+
+            mainThreadResult = sharedThreadLocal.get()->get();
+
+            expectEquals (mainThreadResult.get(), 1);
+            expectEquals (auxThreadResult.get(), 2);
+        }
+
+        beginTest ("values are per-instance");
+
+        {
+            ThreadLocalValue<int> a, b;
+
+            a.get() = 1;
+            b.get() = 2;
+
+            expectEquals (a.get(), 1);
+            expectEquals (b.get(), 2);
+        }
+    }
+
+private:
+    Atomic<int> mainThreadResult, auxThreadResult;
+    Atomic<ThreadLocalValue<int>*> sharedThreadLocal;
+
+    void run() override
+    {
+        sharedThreadLocal.get()->get() = 2;
+        auxThreadResult = sharedThreadLocal.get()->get();
+    }
+};
+
+ThreadLocalValueUnitTest threadLocalValueUnitTest;
+
 #endif
+
+} // namespace juce

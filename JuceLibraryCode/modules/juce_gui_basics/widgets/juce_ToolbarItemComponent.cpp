@@ -2,119 +2,32 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 ToolbarItemFactory::ToolbarItemFactory() {}
 ToolbarItemFactory::~ToolbarItemFactory() {}
-
-//==============================================================================
-class ToolbarItemComponent::ItemDragAndDropOverlayComponent    : public Component
-{
-public:
-    ItemDragAndDropOverlayComponent()
-        : isDragging (false)
-    {
-        setAlwaysOnTop (true);
-        setRepaintsOnMouseActivity (true);
-        setMouseCursor (MouseCursor::DraggingHandCursor);
-    }
-
-    void paint (Graphics& g) override
-    {
-        if (ToolbarItemComponent* const tc = getToolbarItemComponent())
-        {
-            if (isMouseOverOrDragging()
-                  && tc->getEditingMode() == ToolbarItemComponent::editableOnToolbar)
-            {
-                g.setColour (findColour (Toolbar::editingModeOutlineColourId, true));
-                g.drawRect (getLocalBounds(), jmin (2, (getWidth() - 1) / 2,
-                                                       (getHeight() - 1) / 2));
-            }
-        }
-    }
-
-    void mouseDown (const MouseEvent& e) override
-    {
-        isDragging = false;
-
-        if (ToolbarItemComponent* const tc = getToolbarItemComponent())
-        {
-            tc->dragOffsetX = e.x;
-            tc->dragOffsetY = e.y;
-        }
-    }
-
-    void mouseDrag (const MouseEvent& e) override
-    {
-        if (! (isDragging || e.mouseWasClicked()))
-        {
-            isDragging = true;
-
-            if (DragAndDropContainer* const dnd = DragAndDropContainer::findParentDragContainerFor (this))
-            {
-                dnd->startDragging (Toolbar::toolbarDragDescriptor, getParentComponent(), Image::null, true);
-
-                if (ToolbarItemComponent* const tc = getToolbarItemComponent())
-                {
-                    tc->isBeingDragged = true;
-
-                    if (tc->getEditingMode() == ToolbarItemComponent::editableOnToolbar)
-                        tc->setVisible (false);
-                }
-            }
-        }
-    }
-
-    void mouseUp (const MouseEvent&) override
-    {
-        isDragging = false;
-
-        if (ToolbarItemComponent* const tc = getToolbarItemComponent())
-        {
-            tc->isBeingDragged = false;
-
-            if (Toolbar* const tb = tc->getToolbar())
-                tb->updateAllItemPositions (true);
-            else if (tc->getEditingMode() == ToolbarItemComponent::editableOnToolbar)
-                delete tc;
-        }
-    }
-
-    void parentSizeChanged() override
-    {
-        setBounds (0, 0, getParentWidth(), getParentHeight());
-    }
-
-private:
-    //==============================================================================
-    bool isDragging;
-
-    ToolbarItemComponent* getToolbarItemComponent() const noexcept
-    {
-        return dynamic_cast <ToolbarItemComponent*> (getParentComponent());
-    }
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ItemDragAndDropOverlayComponent)
-};
-
 
 //==============================================================================
 ToolbarItemComponent::ToolbarItemComponent (const int itemId_,
@@ -136,12 +49,12 @@ ToolbarItemComponent::ToolbarItemComponent (const int itemId_,
 
 ToolbarItemComponent::~ToolbarItemComponent()
 {
-    overlayComp = nullptr;
+    overlayComp.reset();
 }
 
 Toolbar* ToolbarItemComponent::getToolbar() const
 {
-    return dynamic_cast <Toolbar*> (getParentComponent());
+    return dynamic_cast<Toolbar*> (getParentComponent());
 }
 
 bool ToolbarItemComponent::isToolbarVertical() const
@@ -168,9 +81,9 @@ void ToolbarItemComponent::paintButton (Graphics& g, const bool over, const bool
 
     if (toolbarStyle != Toolbar::iconsOnly)
     {
-        const int indent = contentArea.getX();
-        int y = indent;
-        int h = getHeight() - indent * 2;
+        auto indent = contentArea.getX();
+        auto y = indent;
+        auto h = getHeight() - indent * 2;
 
         if (toolbarStyle == Toolbar::iconsWithText)
         {
@@ -207,7 +120,7 @@ void ToolbarItemComponent::resized()
     }
     else
     {
-        contentArea = Rectangle<int>();
+        contentArea = {};
     }
 
     contentAreaChanged (contentArea);
@@ -222,14 +135,30 @@ void ToolbarItemComponent::setEditingMode (const ToolbarEditingMode newMode)
 
         if (mode == normalMode)
         {
-            overlayComp = nullptr;
+            overlayComp.reset();
         }
         else if (overlayComp == nullptr)
         {
-            addAndMakeVisible (overlayComp = new ItemDragAndDropOverlayComponent());
+            overlayComp.reset (new detail::ToolbarItemDragAndDropOverlayComponent());
+            addAndMakeVisible (overlayComp.get());
             overlayComp->parentSizeChanged();
         }
 
         resized();
     }
 }
+
+//==============================================================================
+std::unique_ptr<AccessibilityHandler> ToolbarItemComponent::createAccessibilityHandler()
+{
+    const auto shouldItemBeAccessible = (itemId != ToolbarItemFactory::separatorBarId
+                                      && itemId != ToolbarItemFactory::spacerId
+                                      && itemId != ToolbarItemFactory::flexibleSpacerId);
+
+    if (! shouldItemBeAccessible)
+        return createIgnoredAccessibilityHandler (*this);
+
+    return std::make_unique<detail::ButtonAccessibilityHandler> (*this, AccessibilityRole::button);
+}
+
+} // namespace juce

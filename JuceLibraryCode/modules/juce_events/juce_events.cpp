@@ -2,27 +2,25 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-   ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#if defined (JUCE_EVENTS_H_INCLUDED) && ! JUCE_AMALGAMATED_INCLUDE
+#ifdef JUCE_EVENTS_H_INCLUDED
  /* When you add this cpp file to your project, you mustn't include it in a file where you've
     already included any other headers - just put it inside a file on its own, possibly with your config
     flags preceding it, but don't include anything else. That also includes avoiding any automatic prefix
@@ -31,16 +29,17 @@
  #error "Incorrect use of JUCE cpp file"
 #endif
 
-// Your project must contain an AppConfig.h file with your project-specific settings in it,
-// and your header search path must make it accessible to the module's files.
-#include "AppConfig.h"
+#define JUCE_CORE_INCLUDE_OBJC_HELPERS 1
+#define JUCE_CORE_INCLUDE_JNI_HELPERS 1
+#define JUCE_CORE_INCLUDE_NATIVE_HEADERS 1
+#define JUCE_CORE_INCLUDE_COM_SMART_PTR 1
+#define JUCE_EVENTS_INCLUDE_WIN32_MESSAGE_WINDOW 1
 
-#include "../juce_core/native/juce_BasicNativeHeaders.h"
-#include "juce_events.h"
-
-#if JUCE_CATCH_UNHANDLED_EXCEPTIONS && JUCE_MODULE_AVAILABLE_juce_gui_basics
- #include "../juce_gui_basics/juce_gui_basics.h"
+#if JUCE_USE_WINRT_MIDI
+ #define JUCE_EVENTS_INCLUDE_WINRT_WRAPPER 1
 #endif
+
+#include "juce_events.h"
 
 //==============================================================================
 #if JUCE_MAC
@@ -50,53 +49,50 @@
  #import <IOKit/hid/IOHIDKeys.h>
  #import <IOKit/pwr_mgt/IOPMLib.h>
 
-#elif JUCE_LINUX
- #include <X11/Xlib.h>
- #include <X11/Xresource.h>
- #include <X11/Xutil.h>
- #undef KeyPress
+#elif JUCE_LINUX || JUCE_BSD
  #include <unistd.h>
 #endif
 
 //==============================================================================
-namespace juce
-{
-
 #include "messages/juce_ApplicationBase.cpp"
 #include "messages/juce_DeletedAtShutdown.cpp"
 #include "messages/juce_MessageListener.cpp"
 #include "messages/juce_MessageManager.cpp"
 #include "broadcasters/juce_ActionBroadcaster.cpp"
 #include "broadcasters/juce_AsyncUpdater.cpp"
+#include "broadcasters/juce_LockingAsyncUpdater.cpp"
 #include "broadcasters/juce_ChangeBroadcaster.cpp"
 #include "timers/juce_MultiTimer.cpp"
 #include "timers/juce_Timer.cpp"
 #include "interprocess/juce_InterprocessConnection.cpp"
 #include "interprocess/juce_InterprocessConnectionServer.cpp"
+#include "interprocess/juce_ConnectedChildProcess.cpp"
+#include "interprocess/juce_NetworkServiceDiscovery.cpp"
+#include "native/juce_ScopedLowPowerModeDisabler.cpp"
 
 //==============================================================================
-#if JUCE_MAC
- #include "../juce_core/native/juce_osx_ObjCHelpers.h"
- #include "native/juce_osx_MessageQueue.h"
- #include "native/juce_mac_MessageManager.mm"
+#if JUCE_MAC || JUCE_IOS
 
-#elif JUCE_IOS
- #include "../juce_core/native/juce_osx_ObjCHelpers.h"
- #include "native/juce_osx_MessageQueue.h"
- #include "native/juce_ios_MessageManager.mm"
+ #include "native/juce_MessageQueue_mac.h"
+
+ #if JUCE_MAC
+  #include "native/juce_MessageManager_mac.mm"
+ #else
+  #include "native/juce_MessageManager_ios.mm"
+ #endif
 
 #elif JUCE_WINDOWS
- #include "native/juce_win32_HiddenMessageWindow.h"
- #include "native/juce_win32_Messaging.cpp"
+ #include "native/juce_RunningInUnity.h"
+ #include "native/juce_Messaging_windows.cpp"
+ #if JUCE_EVENTS_INCLUDE_WINRT_WRAPPER
+  #include "native/juce_WinRTWrapper_windows.cpp"
+ #endif
 
-#elif JUCE_LINUX
- #include "native/juce_ScopedXLock.h"
- #include "native/juce_linux_Messaging.cpp"
+#elif JUCE_LINUX || JUCE_BSD
+ #include "native/juce_EventLoopInternal_linux.h"
+ #include "native/juce_Messaging_linux.cpp"
 
 #elif JUCE_ANDROID
- #include "../juce_core/native/juce_android_JNIHelpers.h"
- #include "native/juce_android_Messaging.cpp"
+ #include "native/juce_Messaging_android.cpp"
 
 #endif
-
-}

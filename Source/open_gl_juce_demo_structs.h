@@ -1,7 +1,10 @@
 #ifndef OPEN_GL_JUCE_DEMO_STRUCTS
-#define OPEN_GL_JUST_DEMO_STRUCTS
+#define OPEN_GL_JUCE_DEMO_STRUCTS
 
 #include "JuceHeader.h"
+
+using namespace juce;
+using namespace juce::gl;
 
 //==============================================================================
 // This class just manages the attributes that the demo shaders use.
@@ -38,8 +41,7 @@ private:
                                                             OpenGLShaderProgram& shader,
                                                             const char* attributeName)
     {
-        if (openGLContext.extensions.glGetAttribLocation (shader.programID, attributeName) < 0)
-            return nullptr;
+        //JOS: if (openGLContext.extensions.glGetAttribLocation (shader.programID, attributeName) < 0) { return nullptr; }
 
         return new OpenGLShaderProgram::Attribute (shader, attributeName);
     }
@@ -63,8 +65,7 @@ private:
                                                         OpenGLShaderProgram& shader,
                                                         const char* uniformName)
     {
-        if (openGLContext.extensions.glGetUniformLocation (shader.programID, uniformName) < 0)
-            return nullptr;
+      //JOS: if (openGLContext.extensions.glGetUniformLocation (shader.programID, uniformName) < 0)  { return nullptr; }
 
         return new OpenGLShaderProgram::Uniform (shader, uniformName);
     }

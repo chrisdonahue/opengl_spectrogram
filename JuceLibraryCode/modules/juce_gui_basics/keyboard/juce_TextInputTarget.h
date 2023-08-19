@@ -2,31 +2,30 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_TEXTINPUTTARGET_H_INCLUDED
-#define JUCE_TEXTINPUTTARGET_H_INCLUDED
+namespace juce
+{
 
-
-//==============================================================================
 /**
     An abstract base class which can be implemented by components that function as
     text editors.
@@ -34,16 +33,18 @@
     This class allows different types of text editor component to provide a uniform
     interface, which can be used by things like OS-specific input methods, on-screen
     keyboards, etc.
+
+    @tags{GUI}
 */
 class JUCE_API  TextInputTarget
 {
 public:
     //==============================================================================
     /** */
-    TextInputTarget() {}
+    TextInputTarget() = default;
 
     /** Destructor. */
-    virtual ~TextInputTarget() {}
+    virtual ~TextInputTarget() = default;
 
     /** Returns true if this input target is currently accepting input.
         For example, a text editor might return false if it's in read-only mode.
@@ -61,7 +62,7 @@ public:
     /** Sets a number of temporarily underlined sections.
         This is needed by MS Windows input method UI.
     */
-    virtual void setTemporaryUnderlining (const Array <Range<int> >& underlinedRegions) = 0;
+    virtual void setTemporaryUnderlining (const Array<Range<int>>& underlinedRegions) = 0;
 
     /** Returns a specified sub-section of the text. */
     virtual String getTextInRange (const Range<int>& range) const = 0;
@@ -69,9 +70,51 @@ public:
     /** Inserts some text, overwriting the selected text region, if there is one. */
     virtual void insertTextAtCaret (const String& textToInsert) = 0;
 
+    /** Returns the current index of the caret. */
+    virtual int getCaretPosition() const = 0;
+
     /** Returns the position of the caret, relative to the component's origin. */
-    virtual Rectangle<int> getCaretRectangle() = 0;
+    Rectangle<int> getCaretRectangle() const        { return getCaretRectangleForCharIndex (getCaretPosition()); }
+
+    /** Returns the bounding box of the character at the given index. */
+    virtual Rectangle<int> getCaretRectangleForCharIndex (int characterIndex) const = 0;
+
+    /** Returns the total number of codepoints in the string. */
+    virtual int getTotalNumChars() const = 0;
+
+    /** Returns the index closest to the given point.
+
+        This is the location where the cursor might be placed after clicking at the given
+        point in a text field.
+    */
+    virtual int getCharIndexForPoint (Point<int> point) const = 0;
+
+    /** Returns the bounding box for a range of text in the editor. As the range may span
+        multiple lines, this method returns a RectangleList.
+
+        The bounds are relative to the component's top-left and may extend beyond the bounds
+        of the component if the text is long and word wrapping is disabled.
+    */
+    virtual RectangleList<int> getTextBounds (Range<int> textRange) const = 0;
+
+    /** A set of possible on-screen keyboard types, for use in the
+        getKeyboardType() method.
+    */
+    enum VirtualKeyboardType
+    {
+        textKeyboard = 0,
+        numericKeyboard,
+        decimalKeyboard,
+        urlKeyboard,
+        emailAddressKeyboard,
+        phoneNumberKeyboard,
+        passwordKeyboard
+    };
+
+    /** Returns the target's preference for the type of keyboard that would be most appropriate.
+        This may be ignored, depending on the capabilities of the OS.
+    */
+    virtual VirtualKeyboardType getKeyboardType()       { return textKeyboard; }
 };
 
-
-#endif   // JUCE_TEXTINPUTTARGET_H_INCLUDED
+} // namespace juce

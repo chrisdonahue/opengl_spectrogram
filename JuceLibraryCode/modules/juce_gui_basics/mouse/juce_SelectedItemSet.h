@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_SELECTEDITEMSET_H_INCLUDED
-#define JUCE_SELECTEDITEMSET_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /** Manages a list of selectable items.
@@ -39,22 +39,20 @@
     To be informed when items are selected/deselected, register a ChangeListener with
     this object.
 
-    @see SelectableObject
+    @tags{GUI}
 */
 template <class SelectableItemType>
 class SelectedItemSet   : public ChangeBroadcaster
 {
 public:
     //==============================================================================
-    typedef SelectableItemType ItemType;
-    typedef Array<SelectableItemType> ItemArray;
-    typedef PARAMETER_TYPE (SelectableItemType) ParameterType;
+    using ItemType = SelectableItemType;
+    using ItemArray = Array<SelectableItemType>;
+    using ParameterType = typename TypeHelpers::ParameterType<SelectableItemType>::type;
 
     //==============================================================================
     /** Creates an empty set. */
-    SelectedItemSet()
-    {
-    }
+    SelectedItemSet() = default;
 
     /** Creates a set based on an array of items. */
     explicit SelectedItemSet (const ItemArray& items)
@@ -64,7 +62,7 @@ public:
 
     /** Creates a copy of another set. */
     SelectedItemSet (const SelectedItemSet& other)
-        : selectedItems (other.selectedItems)
+        : ChangeBroadcaster(), selectedItems (other.selectedItems)
     {
     }
 
@@ -73,8 +71,20 @@ public:
     {
         if (selectedItems != other.selectedItems)
         {
-            selectedItems = other.selectedItems;
             changed();
+
+            for (int i = selectedItems.size(); --i >= 0;)
+                if (! other.isSelected (selectedItems.getReference (i)))
+                    itemDeselected (selectedItems.removeAndReturn (i));
+
+            for (auto& i : other.selectedItems)
+            {
+                if (! isSelected (i))
+                {
+                    selectedItems.add (i);
+                    itemSelected (i);
+                }
+            }
         }
 
         return *this;
@@ -103,8 +113,8 @@ public:
         }
         else
         {
-            deselectAll();
             changed();
+            deselectAll();
 
             selectedItems.add (item);
             itemSelected (item);
@@ -225,7 +235,7 @@ public:
         if (i >= 0)
         {
             changed();
-            itemDeselected (selectedItems.remove (i));
+            itemDeselected (selectedItems.removeAndReturn (i));
         }
     }
 
@@ -238,7 +248,7 @@ public:
 
             for (int i = selectedItems.size(); --i >= 0;)
             {
-                itemDeselected (selectedItems.remove (i));
+                itemDeselected (selectedItems.removeAndReturn (i));
                 i = jmin (i, selectedItems.size());
             }
         }
@@ -263,10 +273,15 @@ public:
     const ItemArray& getItemArray() const noexcept              { return selectedItems; }
 
     /** Provides iterator access to the array of items. */
-    SelectableItemType* begin() const noexcept                  { return selectedItems.begin(); }
+    SelectableItemType* begin() noexcept                        { return selectedItems.begin(); }
+
+    const SelectableItemType* begin() const noexcept            { return selectedItems.begin(); }
 
     /** Provides iterator access to the array of items. */
-    SelectableItemType* end() const noexcept                    { return selectedItems.end(); }
+    SelectableItemType* end() noexcept                          { return selectedItems.end(); }
+
+    /** Provides iterator access to the array of items. */
+    const SelectableItemType* end() const noexcept              { return selectedItems.end(); }
 
     //==============================================================================
     /** Can be overridden to do special handling when an item is selected.
@@ -309,5 +324,4 @@ private:
     JUCE_LEAK_DETECTOR (SelectedItemSet<SelectableItemType>)
 };
 
-
-#endif   // JUCE_SELECTEDITEMSET_H_INCLUDED
+} // namespace juce

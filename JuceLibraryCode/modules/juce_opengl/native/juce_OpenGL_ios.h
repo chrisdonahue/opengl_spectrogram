@@ -2,27 +2,26 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
-
-} // (juce namespace)
 
 @interface JuceGLView   : UIView
 {
@@ -37,70 +36,79 @@
 }
 @end
 
+extern "C" GLvoid glResolveMultisampleFramebufferAPPLE();
+
 namespace juce
 {
 
 class OpenGLContext::NativeContext
 {
 public:
-    NativeContext (Component& component,
+    NativeContext (Component& c,
                    const OpenGLPixelFormat& pixFormat,
                    void* contextToShare,
-                   bool multisampling)
-        : frameBufferHandle (0), colorBufferHandle (0), depthBufferHandle (0),
-          msaaColorHandle (0), msaaBufferHandle (0),
-          lastWidth (0), lastHeight (0), needToRebuildBuffers (false),
-          swapFrames (0), useDepthBuffer (pixFormat.depthBufferBits > 0),
+                   bool multisampling,
+                   OpenGLVersion version)
+        : component (c), openGLversion (version),
+          useDepthBuffer (pixFormat.depthBufferBits > 0),
           useMSAA (multisampling)
     {
         JUCE_AUTORELEASEPOOL
         {
-            ComponentPeer* const peer = component.getPeer();
-            jassert (peer != nullptr);
+            if (auto* peer = component.getPeer())
+            {
+                auto bounds = peer->getAreaCoveredBy (component);
 
-            const Rectangle<int> bounds (peer->getComponent().getLocalArea (&component, component.getLocalBounds()));
-            lastWidth  = bounds.getWidth();
-            lastHeight = bounds.getHeight();
+                view = [[JuceGLView alloc] initWithFrame: convertToCGRect (bounds)];
+                view.opaque = YES;
+                view.hidden = NO;
+                view.backgroundColor = [UIColor blackColor];
+                view.userInteractionEnabled = NO;
 
-            view = [[JuceGLView alloc] initWithFrame: convertToCGRect (bounds)];
-            view.opaque = YES;
-            view.hidden = NO;
-            view.backgroundColor = [UIColor blackColor];
-            view.userInteractionEnabled = NO;
+                glLayer = (CAEAGLLayer*) [view layer];
+                glLayer.opaque = true;
 
-            glLayer = (CAEAGLLayer*) [view layer];
-            glLayer.contentsScale = Desktop::getInstance().getDisplays().getMainDisplay().scale;
-            glLayer.opaque = true;
+                updateWindowPosition (bounds);
 
-            [((UIView*) peer->getNativeHandle()) addSubview: view];
+                [((UIView*) peer->getNativeHandle()) addSubview: view];
 
-            context = [EAGLContext alloc];
+                const auto shouldUseES3 = version != defaultGLVersion
+                                       && [[UIDevice currentDevice].systemVersion floatValue] >= 7.0;
 
-            const NSUInteger type = kEAGLRenderingAPIOpenGLES2;
+                const auto gotContext = (shouldUseES3 && createContext (kEAGLRenderingAPIOpenGLES3, contextToShare))
+                                     || createContext (kEAGLRenderingAPIOpenGLES2, contextToShare);
 
-            if (contextToShare != nullptr)
-                [context initWithAPI: type  sharegroup: [(EAGLContext*) contextToShare sharegroup]];
+                jassertquiet (gotContext);
+
+                if (context != nil)
+                {
+                    // I'd prefer to put this stuff in the initialiseOnRenderThread() call, but doing
+                    // so causes mysterious timing-related failures.
+                    [EAGLContext setCurrentContext: context.get()];
+                    gl::loadFunctions();
+                    createGLBuffers();
+                    deactivateCurrentContext();
+                }
+                else
+                {
+                    jassertfalse;
+                }
+            }
             else
-                [context initWithAPI: type];
-
-            // I'd prefer to put this stuff in the initialiseOnRenderThread() call, but doing
-            // so causes myserious timing-related failures.
-            [EAGLContext setCurrentContext: context];
-            createGLBuffers();
-            deactivateCurrentContext();
+            {
+                jassertfalse;
+            }
         }
     }
 
     ~NativeContext()
     {
-        [context release];
-        context = nil;
-
+        context.reset();
         [view removeFromSuperview];
         [view release];
     }
 
-    void initialiseOnRenderThread (OpenGLContext&) {}
+    InitResult initialiseOnRenderThread (OpenGLContext&)    { return InitResult::success; }
 
     void shutdownOnRenderThread()
     {
@@ -110,12 +118,12 @@ public:
     }
 
     bool createdOk() const noexcept             { return getRawContext() != nullptr; }
-    void* getRawContext() const noexcept        { return context; }
-    GLuint getFrameBufferID() const noexcept    { return frameBufferHandle; }
+    void* getRawContext() const noexcept        { return context.get(); }
+    GLuint getFrameBufferID() const noexcept    { return useMSAA ? msaaBufferHandle : frameBufferHandle; }
 
     bool makeActive() const noexcept
     {
-        if (! [EAGLContext setCurrentContext: context])
+        if (! [EAGLContext setCurrentContext: context.get()])
             return false;
 
         glBindFramebuffer (GL_FRAMEBUFFER, useMSAA ? msaaBufferHandle
@@ -125,7 +133,7 @@ public:
 
     bool isActive() const noexcept
     {
-        return [EAGLContext currentContext] == context;
+        return [EAGLContext currentContext] == context.get();
     }
 
     static void deactivateCurrentContext()
@@ -135,8 +143,29 @@ public:
 
     void swapBuffers()
     {
+        if (useMSAA)
+        {
+            glBindFramebuffer (GL_DRAW_FRAMEBUFFER, frameBufferHandle);
+            glBindFramebuffer (GL_READ_FRAMEBUFFER, msaaBufferHandle);
+
+            if (openGLversion >= openGL3_2)
+            {
+                auto w = roundToInt (lastBounds.getWidth()  * glLayer.contentsScale);
+                auto h = roundToInt (lastBounds.getHeight() * glLayer.contentsScale);
+
+                glBlitFramebuffer (0, 0, w, h,
+                                   0, 0, w, h,
+                                   GL_COLOR_BUFFER_BIT,
+                                   GL_NEAREST);
+            }
+            else
+            {
+                ::glResolveMultisampleFramebufferAPPLE();
+            }
+        }
+
         glBindRenderbuffer (GL_RENDERBUFFER, colorBufferHandle);
-        [context presentRenderbuffer: GL_RENDERBUFFER];
+        [context.get() presentRenderbuffer: GL_RENDERBUFFER];
 
         if (needToRebuildBuffers)
         {
@@ -148,19 +177,20 @@ public:
         }
     }
 
-    void updateWindowPosition (const Rectangle<int>& bounds)
+    void updateWindowPosition (Rectangle<int> bounds)
     {
         view.frame = convertToCGRect (bounds);
+        glLayer.contentsScale = (CGFloat) (Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale
+                                            / component.getDesktopScaleFactor());
 
-        if (lastWidth != bounds.getWidth() || lastHeight != bounds.getHeight())
+        if (lastBounds != bounds)
         {
-            lastWidth  = bounds.getWidth();
-            lastHeight = bounds.getHeight();
+            lastBounds = bounds;
             needToRebuildBuffers = true;
         }
     }
 
-    bool setSwapInterval (const int numFramesPerSwap) noexcept
+    bool setSwapInterval (int numFramesPerSwap) noexcept
     {
         swapFrames = numFramesPerSwap;
         return false;
@@ -168,19 +198,40 @@ public:
 
     int getSwapInterval() const noexcept    { return swapFrames; }
 
-    struct Locker { Locker (NativeContext&) {} };
+    struct Locker
+    {
+        explicit Locker (NativeContext& ctx) : lock (ctx.mutex) {}
+        const ScopedLock lock;
+    };
 
 private:
-    JuceGLView* view;
-    CAEAGLLayer* glLayer;
-    EAGLContext* context;
-    GLuint frameBufferHandle, colorBufferHandle, depthBufferHandle,
-           msaaColorHandle, msaaBufferHandle;
+    CriticalSection mutex;
+    Component& component;
+    JuceGLView* view = nil;
+    CAEAGLLayer* glLayer = nil;
+    NSUniquePtr<EAGLContext> context;
+    const OpenGLVersion openGLversion;
+    const bool useDepthBuffer, useMSAA;
 
-    int volatile lastWidth, lastHeight;
-    bool volatile needToRebuildBuffers;
-    int swapFrames;
-    bool useDepthBuffer, useMSAA;
+    GLuint frameBufferHandle = 0, colorBufferHandle = 0, depthBufferHandle = 0,
+           msaaColorHandle = 0, msaaBufferHandle = 0;
+
+    Rectangle<int> lastBounds;
+    int swapFrames = 0;
+    bool needToRebuildBuffers = false;
+
+    bool createContext (EAGLRenderingAPI type, void* contextToShare)
+    {
+        jassert (context == nil);
+        context.reset ([EAGLContext alloc]);
+
+        if (contextToShare != nullptr)
+            [context.get() initWithAPI: type  sharegroup: [(EAGLContext*) contextToShare sharegroup]];
+        else
+            [context.get() initWithAPI: type];
+
+        return context != nil;
+    }
 
     //==============================================================================
     void createGLBuffers()
@@ -193,8 +244,8 @@ private:
 
         glFramebufferRenderbuffer (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBufferHandle);
 
-        bool ok = [context renderbufferStorage: GL_RENDERBUFFER fromDrawable: glLayer];
-        jassert (ok); (void) ok;
+        [[maybe_unused]] bool ok = [context.get() renderbufferStorage: GL_RENDERBUFFER fromDrawable: glLayer];
+        jassert (ok);
 
         GLint width, height;
         glGetRenderbufferParameteriv (GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &width);
@@ -208,7 +259,7 @@ private:
             glBindFramebuffer (GL_FRAMEBUFFER, msaaBufferHandle);
             glBindRenderbuffer (GL_RENDERBUFFER, msaaColorHandle);
 
-            glRenderbufferStorageMultisampleAPPLE (GL_RENDERBUFFER, 4, GL_RGBA8_OES, width, height);
+            glRenderbufferStorageMultisample (GL_RENDERBUFFER, 4, GL_RGBA8, width, height);
 
             glFramebufferRenderbuffer (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msaaColorHandle);
         }
@@ -219,7 +270,7 @@ private:
             glBindRenderbuffer (GL_RENDERBUFFER, depthBufferHandle);
 
             if (useMSAA)
-                glRenderbufferStorageMultisampleAPPLE (GL_RENDERBUFFER, 4, GL_DEPTH_COMPONENT16, width, height);
+                glRenderbufferStorageMultisample (GL_RENDERBUFFER, 4, GL_DEPTH_COMPONENT16, width, height);
             else
                 glRenderbufferStorage (GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
 
@@ -233,7 +284,7 @@ private:
     void freeGLBuffers()
     {
         JUCE_CHECK_OPENGL_ERROR
-        [context renderbufferStorage: GL_RENDERBUFFER fromDrawable: nil];
+        [context.get() renderbufferStorage: GL_RENDERBUFFER fromDrawable: nil];
 
         deleteFrameBuffer (frameBufferHandle);
         deleteFrameBuffer (msaaBufferHandle);
@@ -255,3 +306,5 @@ bool OpenGLHelpers::isContextActive()
 {
     return [EAGLContext currentContext] != nil;
 }
+
+} // namespace juce

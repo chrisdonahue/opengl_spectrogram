@@ -1,34 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_INPUTSTREAM_H_INCLUDED
-#define JUCE_INPUTSTREAM_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /** The base class for streams that read data.
@@ -37,12 +30,14 @@
     some or all of the virtual functions to implement their behaviour.
 
     @see OutputStream, MemoryInputStream, BufferedInputStream, FileInputStream
+
+    @tags{Core}
 */
 class JUCE_API  InputStream
 {
 public:
     /** Destructor. */
-    virtual ~InputStream()  {}
+    virtual ~InputStream() = default;
 
     //==============================================================================
     /** Returns the total number of bytes available for reading in this stream.
@@ -81,6 +76,8 @@ public:
                     maxBytesToRead if the stream is exhausted before it gets that far
     */
     virtual int read (void* destBuffer, int maxBytesToRead) = 0;
+
+    ssize_t read (void* destBuffer, size_t maxBytesToRead);
 
     /** Reads a byte from the stream.
         If the stream is exhausted, this will return zero.
@@ -211,7 +208,7 @@ public:
     /** Tries to read the whole stream and turn it into a string.
 
         This will read from the stream's current position until the end-of-stream.
-        It can read from either UTF-16 or UTF-8 formats.
+        It can read from UTF-8 data, or UTF-16 if it detects suitable header-bytes.
     */
     virtual String readEntireStreamAsString();
 
@@ -223,8 +220,8 @@ public:
                                     will be read until the stream is exhausted.
         @returns the number of bytes that were added to the memory block
     */
-    virtual int readIntoMemoryBlock (MemoryBlock& destBlock,
-                                     ssize_t maxNumBytesToRead = -1);
+    virtual size_t readIntoMemoryBlock (MemoryBlock& destBlock,
+                                        ssize_t maxNumBytesToRead = -1);
 
     //==============================================================================
     /** Returns the offset of the next byte that will be read from the stream.
@@ -248,19 +245,20 @@ public:
 
     /** Reads and discards a number of bytes from the stream.
 
-        Some input streams might implement this efficiently, but the base
+        Some input streams might implement this more efficiently, but the base
         class will just keep reading data until the requisite number of bytes
-        have been done.
+        have been done. For large skips it may be quicker to call setPosition()
+        with the required position.
     */
     virtual void skipNextBytes (int64 numBytesToSkip);
 
 
 protected:
     //==============================================================================
-    InputStream() noexcept {}
+    InputStream() = default;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InputStream)
 };
 
-#endif   // JUCE_INPUTSTREAM_H_INCLUDED
+} // namespace juce

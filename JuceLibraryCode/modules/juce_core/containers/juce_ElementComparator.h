@@ -1,51 +1,49 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_ELEMENTCOMPARATOR_H_INCLUDED
-#define JUCE_ELEMENTCOMPARATOR_H_INCLUDED
+namespace juce
+{
 
 #ifndef DOXYGEN
 
 /** This is an internal helper class which converts a juce ElementComparator style
     class (using a "compareElements" method) into a class that's compatible with
     std::sort (i.e. using an operator() to compare the elements)
+
+    @tags{Core}
 */
 template <typename ElementComparator>
 struct SortFunctionConverter
 {
     SortFunctionConverter (ElementComparator& e) : comparator (e) {}
+    SortFunctionConverter (const SortFunctionConverter&) = default;
 
     template <typename Type>
     bool operator() (Type a, Type b)  { return comparator.compareElements (a, b) < 0; }
 
 private:
     ElementComparator& comparator;
-    SortFunctionConverter& operator= (const SortFunctionConverter&) JUCE_DELETED_FUNCTION;
+
+    SortFunctionConverter& operator= (const SortFunctionConverter&) = delete;
 };
 
 #endif
@@ -86,12 +84,17 @@ static void sortArray (ElementComparator& comparator,
                        int lastElement,
                        const bool retainOrderOfEquivalentItems)
 {
-    SortFunctionConverter<ElementComparator> converter (comparator);
+    jassert (firstElement >= 0);
 
-    if (retainOrderOfEquivalentItems)
-        std::stable_sort (array + firstElement, array + lastElement + 1, converter);
-    else
-        std::sort        (array + firstElement, array + lastElement + 1, converter);
+    if (lastElement > firstElement)
+    {
+        SortFunctionConverter<ElementComparator> converter (comparator);
+
+        if (retainOrderOfEquivalentItems)
+            std::stable_sort (array + firstElement, array + lastElement + 1, converter);
+        else
+            std::sort        (array + firstElement, array + lastElement + 1, converter);
+    }
 }
 
 
@@ -120,16 +123,13 @@ static void sortArray (ElementComparator& comparator,
     @param lastElement      the index of the last element in the range (this is non-inclusive)
 */
 template <class ElementType, class ElementComparator>
-static int findInsertIndexInSortedArray (ElementComparator& comparator,
+static int findInsertIndexInSortedArray ([[maybe_unused]] ElementComparator& comparator,
                                          ElementType* const array,
                                          const ElementType newElement,
                                          int firstElement,
                                          int lastElement)
 {
     jassert (firstElement <= lastElement);
-
-    (void) comparator;  // if you pass in an object with a static compareElements() method, this
-                        // avoids getting warning messages about the parameter being unused
 
     while (firstElement < lastElement)
     {
@@ -171,18 +171,20 @@ static int findInsertIndexInSortedArray (ElementComparator& comparator,
     This will work for primitive types and objects that implement operator<().
 
     Example: @code
-    Array <int> myArray;
+    Array<int> myArray;
     DefaultElementComparator<int> sorter;
     myArray.sort (sorter);
     @endcode
 
     @see ElementComparator
+
+    @tags{Core}
 */
 template <class ElementType>
 class DefaultElementComparator
 {
 private:
-    typedef PARAMETER_TYPE (ElementType) ParameterType;
+    using ParameterType = typename TypeHelpers::ParameterType<ElementType>::type;
 
 public:
     static int compareElements (ParameterType first, ParameterType second)
@@ -191,5 +193,4 @@ public:
     }
 };
 
-
-#endif   // JUCE_ELEMENTCOMPARATOR_H_INCLUDED
+} // namespace juce

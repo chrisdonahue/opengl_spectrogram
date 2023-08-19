@@ -2,33 +2,36 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_LOOKANDFEEL_H_INCLUDED
-#define JUCE_LOOKANDFEEL_H_INCLUDED
+namespace juce
+{
 
 //==============================================================================
 /** This class is used to hold a few look and feel base classes which are associated
     with classes that may not be present because they're from modules other than
     juce_gui_basics.
+
+    @tags{GUI}
 */
 struct JUCE_API  ExtraLookAndFeelBaseClasses
 {
@@ -36,7 +39,7 @@ struct JUCE_API  ExtraLookAndFeelBaseClasses
     /** This abstract base class is implemented by LookAndFeel classes. */
     struct JUCE_API  LassoComponentMethods
     {
-        virtual ~LassoComponentMethods() {}
+        virtual ~LassoComponentMethods() = default;
 
         virtual void drawLasso (Graphics&, Component& lassoComp) = 0;
     };
@@ -45,7 +48,7 @@ struct JUCE_API  ExtraLookAndFeelBaseClasses
     /** This abstract base class is implemented by LookAndFeel classes. */
     struct JUCE_API  KeyMappingEditorComponentMethods
     {
-        virtual ~KeyMappingEditorComponentMethods() {}
+        virtual ~KeyMappingEditorComponentMethods() = default;
 
         virtual void drawKeymapChangeButton (Graphics&, int width, int height, Button&, const String& keyDescription) = 0;
     };
@@ -54,7 +57,7 @@ struct JUCE_API  ExtraLookAndFeelBaseClasses
     /** This abstract base class is implemented by LookAndFeel classes. */
     struct JUCE_API  AudioDeviceSelectorComponentMethods
     {
-        virtual ~AudioDeviceSelectorComponentMethods() {}
+        virtual ~AudioDeviceSelectorComponentMethods() = default;
 
         virtual void drawLevelMeter (Graphics&, int width, int height, float level) = 0;
     };
@@ -70,6 +73,8 @@ struct JUCE_API  ExtraLookAndFeelBaseClasses
     instantiate, see LookAndFeel_V1, LookAndFeel_V2 and LookAndFeel_V3.
 
     @see LookAndFeel_V1, LookAndFeel_V2, LookAndFeel_V3
+
+    @tags{GUI}
 */
 class JUCE_API  LookAndFeel   : public ScrollBar::LookAndFeelMethods,
                                 public Button::LookAndFeelMethods,
@@ -98,7 +103,8 @@ class JUCE_API  LookAndFeel   : public ScrollBar::LookAndFeelMethods,
                                 public StretchableLayoutResizerBar::LookAndFeelMethods,
                                 public ExtraLookAndFeelBaseClasses::KeyMappingEditorComponentMethods,
                                 public ExtraLookAndFeelBaseClasses::AudioDeviceSelectorComponentMethods,
-                                public ExtraLookAndFeelBaseClasses::LassoComponentMethods
+                                public ExtraLookAndFeelBaseClasses::LassoComponentMethods,
+                                public SidePanel::LookAndFeelMethods
 {
 public:
     //==============================================================================
@@ -106,7 +112,7 @@ public:
     LookAndFeel();
 
     /** Destructor. */
-    virtual ~LookAndFeel();
+    ~LookAndFeel() override;
 
     //==============================================================================
     /** Returns the current default look-and-feel for a component to use when it
@@ -133,7 +139,7 @@ public:
         returned. If none has been set, it will just return Colours::black.
 
         The colour IDs for various purposes are stored as enums in the components that
-        they are relevent to - for an example, see Slider::ColourIds,
+        they are relevant to - for an example, see Slider::ColourIds,
         Label::ColourIds, TextEditor::ColourIds, TreeView::ColourIds, etc.
 
         If you're looking up a colour for use in drawing a component, it's usually
@@ -147,7 +153,9 @@ public:
     Colour findColour (int colourId) const noexcept;
 
     /** Registers a colour to be used for a particular purpose.
+
         For more details, see the comments for findColour().
+
         @see findColour, Component::findColour, Component::setColour
     */
     void setColour (int colourId, Colour colour) noexcept;
@@ -159,60 +167,96 @@ public:
 
     //==============================================================================
     /** Returns the typeface that should be used for a given font.
+
         The default implementation just does what you'd expect it to, but you can override
         this if you want to intercept fonts and use your own custom typeface object.
+
+        @see setDefaultTypeface
     */
     virtual Typeface::Ptr getTypefaceForFont (const Font&);
+
+    /** Allows you to supply a default typeface that will be returned as the default
+        sans-serif font.
+
+        Instead of a typeface object, you can specify a typeface by name using the
+        setDefaultSansSerifTypefaceName() method.
+
+        You can perform more complex typeface substitutions by overloading
+        getTypefaceForFont() but this lets you easily set a global typeface.
+    */
+    void setDefaultSansSerifTypeface (Typeface::Ptr newDefaultTypeface);
 
     /** Allows you to change the default sans-serif font.
 
         If you need to supply your own Typeface object for any of the default fonts, rather
         than just supplying the name (e.g. if you want to use an embedded font), then
-        you should instead override getTypefaceForFont() to create and return the typeface.
+        you can instead call setDefaultSansSerifTypeface() with an object to use.
     */
     void setDefaultSansSerifTypefaceName (const String& newName);
 
     //==============================================================================
-    /** Override this to get the chance to swap a component's mouse cursor for a
-        customised one.
+    /** Sets whether native alert windows (if available) or standard JUCE AlertWindows
+        drawn with AlertWindow::LookAndFeelMethods will be used.
+
+        @see isUsingNativeAlertWindows
     */
-    virtual MouseCursor getMouseCursorFor (Component&);
-
-    //==============================================================================
-    /** Creates a new graphics context object. */
-    virtual LowLevelGraphicsContext* createGraphicsContext (const Image& imageToRenderOn,
-                                                            const Point<int>& origin,
-                                                            const RectangleList<int>& initialClip);
-
     void setUsingNativeAlertWindows (bool shouldUseNativeAlerts);
+
+    /** Returns true if native alert windows will be used (if available).
+
+        The default setting for this is false.
+
+        @see setUsingNativeAlertWindows
+    */
     bool isUsingNativeAlertWindows();
 
     //==============================================================================
     /** Draws a small image that spins to indicate that something's happening.
+
         This method should use the current time to animate itself, so just keep
         repainting it every so often.
     */
     virtual void drawSpinningWaitAnimation (Graphics&, const Colour& colour,
                                             int x, int y, int w, int h) = 0;
 
-    //==============================================================================
     /** Returns a tick shape for use in yes/no boxes, etc. */
     virtual Path getTickShape (float height) = 0;
+
     /** Returns a cross shape for use in yes/no boxes, etc. */
     virtual Path getCrossShape (float height) = 0;
 
-    //==============================================================================
-    virtual DropShadower* createDropShadowerForComponent (Component*) = 0;
+    /** Creates a drop-shadower for a given component, if required.
+
+        @see DropShadower
+    */
+    virtual std::unique_ptr<DropShadower> createDropShadowerForComponent (Component&) = 0;
+
+    /** Creates a focus outline for a given component, if required.
+
+        @see FocusOutline
+    */
+    virtual std::unique_ptr<FocusOutline> createFocusOutlineForComponent (Component&) = 0;
 
     //==============================================================================
-    /** Plays the system's default 'beep' noise, to alert the user about something very important. */
+    /** Override this to get the chance to swap a component's mouse cursor for a
+        customised one.
+
+        @see MouseCursor
+    */
+    virtual MouseCursor getMouseCursorFor (Component&);
+
+    /** Creates a new graphics context object. */
+    virtual std::unique_ptr<LowLevelGraphicsContext> createGraphicsContext (const Image& imageToRenderOn,
+                                                                            Point<int> origin,
+                                                                            const RectangleList<int>& initialClip);
+
+    /** Plays the system's default 'beep' noise, to alert the user about something
+        very important. This is only supported on some platforms.
+    */
     virtual void playAlertSound();
 
 private:
     //==============================================================================
-    friend class WeakReference<LookAndFeel>;
-    WeakReference<LookAndFeel>::Master masterReference;
-
     struct ColourSetting
     {
         int colourID;
@@ -224,10 +268,11 @@ private:
 
     SortedSet<ColourSetting> colours;
     String defaultSans, defaultSerif, defaultFixed;
-    bool useNativeAlertWindows;
+    Typeface::Ptr defaultTypeface;
+    bool useNativeAlertWindows = false;
 
+    JUCE_DECLARE_WEAK_REFERENCEABLE (LookAndFeel)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LookAndFeel)
 };
 
-
-#endif   // JUCE_LOOKANDFEEL_H_INCLUDED
+} // namespace juce

@@ -1,100 +1,78 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-NamedValueSet::NamedValue::NamedValue() noexcept
+namespace juce
 {
-}
 
-inline NamedValueSet::NamedValue::NamedValue (const Identifier n, const var& v)
-    : name (n), value (v)
-{
-}
+NamedValueSet::NamedValue::NamedValue() noexcept {}
+NamedValueSet::NamedValue::~NamedValue() noexcept {}
 
-NamedValueSet::NamedValue::NamedValue (const NamedValue& other)
-    : name (other.name), value (other.value)
-{
-}
+NamedValueSet::NamedValue::NamedValue (const Identifier& n, const var& v)  : name (n), value (v) {}
+NamedValueSet::NamedValue::NamedValue (const NamedValue& other) : NamedValue (other.name, other.value) {}
 
-NamedValueSet::NamedValue& NamedValueSet::NamedValue::operator= (const NamedValueSet::NamedValue& other)
-{
-    name = other.name;
-    value = other.value;
-    return *this;
-}
-
-#if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
 NamedValueSet::NamedValue::NamedValue (NamedValue&& other) noexcept
-    : nextListItem (static_cast <LinkedListPointer<NamedValue>&&> (other.nextListItem)),
-      name (static_cast <Identifier&&> (other.name)),
-      value (static_cast <var&&> (other.value))
+   : NamedValue (std::move (other.name),
+                 std::move (other.value))
+{}
+
+NamedValueSet::NamedValue::NamedValue (const Identifier& n, var&& v) noexcept
+   : name (n), value (std::move (v))
 {
 }
 
-inline NamedValueSet::NamedValue::NamedValue (const Identifier n, var&& v)
-    : name (n), value (static_cast <var&&> (v))
-{
-}
+NamedValueSet::NamedValue::NamedValue (Identifier&& n, var&& v) noexcept
+   : name (std::move (n)),
+     value (std::move (v))
+{}
 
 NamedValueSet::NamedValue& NamedValueSet::NamedValue::operator= (NamedValue&& other) noexcept
 {
-    nextListItem = static_cast <LinkedListPointer<NamedValue>&&> (other.nextListItem);
-    name = static_cast <Identifier&&> (other.name);
-    value = static_cast <var&&> (other.value);
+    name = std::move (other.name);
+    value = std::move (other.value);
     return *this;
 }
-#endif
 
-bool NamedValueSet::NamedValue::operator== (const NamedValueSet::NamedValue& other) const noexcept
-{
-    return name == other.name && value == other.value;
-}
+bool NamedValueSet::NamedValue::operator== (const NamedValue& other) const noexcept   { return name == other.name && value == other.value; }
+bool NamedValueSet::NamedValue::operator!= (const NamedValue& other) const noexcept   { return ! operator== (other); }
 
 //==============================================================================
-NamedValueSet::NamedValueSet() noexcept
-{
-}
+NamedValueSet::NamedValueSet() noexcept {}
+NamedValueSet::~NamedValueSet() noexcept {}
 
-NamedValueSet::NamedValueSet (const NamedValueSet& other)
+NamedValueSet::NamedValueSet (const NamedValueSet& other)  : values (other.values) {}
+
+NamedValueSet::NamedValueSet (NamedValueSet&& other) noexcept
+   : values (std::move (other.values)) {}
+
+NamedValueSet::NamedValueSet (std::initializer_list<NamedValue> list)
+   : values (std::move (list))
 {
-    values.addCopyOfList (other.values);
 }
 
 NamedValueSet& NamedValueSet::operator= (const NamedValueSet& other)
 {
     clear();
-    values.addCopyOfList (other.values);
+    values = other.values;
     return *this;
-}
-
-#if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-NamedValueSet::NamedValueSet (NamedValueSet&& other) noexcept
-    : values (static_cast <LinkedListPointer<NamedValue>&&> (other.values))
-{
 }
 
 NamedValueSet& NamedValueSet::operator= (NamedValueSet&& other) noexcept
@@ -102,208 +80,227 @@ NamedValueSet& NamedValueSet::operator= (NamedValueSet&& other) noexcept
     other.values.swapWith (values);
     return *this;
 }
-#endif
-
-NamedValueSet::~NamedValueSet()
-{
-    clear();
-}
 
 void NamedValueSet::clear()
 {
-    values.deleteAll();
+    values.clear();
 }
 
-bool NamedValueSet::operator== (const NamedValueSet& other) const
+bool NamedValueSet::operator== (const NamedValueSet& other) const noexcept
 {
-    const NamedValue* i1 = values;
-    const NamedValue* i2 = other.values;
+    auto num = values.size();
 
-    while (i1 != nullptr && i2 != nullptr)
+    if (num != other.values.size())
+        return false;
+
+    for (int i = 0; i < num; ++i)
     {
-        if (! (*i1 == *i2))
-            return false;
+        // optimise for the case where the keys are in the same order
+        if (values.getReference(i).name == other.values.getReference(i).name)
+        {
+            if (values.getReference(i).value != other.values.getReference(i).value)
+                return false;
+        }
+        else
+        {
+            // if we encounter keys that are in a different order, search remaining items by brute force..
+            for (int j = i; j < num; ++j)
+            {
+                if (auto* otherVal = other.getVarPointer (values.getReference(j).name))
+                    if (values.getReference(j).value == *otherVal)
+                        continue;
 
-        i1 = i1->nextListItem;
-        i2 = i2->nextListItem;
+                return false;
+            }
+
+            return true;
+        }
     }
 
     return true;
 }
 
-bool NamedValueSet::operator!= (const NamedValueSet& other) const
+bool NamedValueSet::operator!= (const NamedValueSet& other) const noexcept   { return ! operator== (other); }
+
+int NamedValueSet::size() const noexcept        { return values.size(); }
+bool NamedValueSet::isEmpty() const noexcept    { return values.isEmpty(); }
+
+static const var& getNullVarRef() noexcept
 {
-    return ! operator== (other);
+    static var nullVar;
+    return nullVar;
 }
 
-int NamedValueSet::size() const noexcept
+const var& NamedValueSet::operator[] (const Identifier& name) const noexcept
 {
-    return values.size();
+    if (auto* v = getVarPointer (name))
+        return *v;
+
+    return getNullVarRef();
 }
 
-const var& NamedValueSet::operator[] (const Identifier name) const
+var NamedValueSet::getWithDefault (const Identifier& name, const var& defaultReturnValue) const
 {
-    for (NamedValue* i = values; i != nullptr; i = i->nextListItem)
-        if (i->name == name)
-            return i->value;
-
-    return var::null;
-}
-
-var NamedValueSet::getWithDefault (const Identifier name, const var& defaultReturnValue) const
-{
-    if (const var* const v = getVarPointer (name))
+    if (auto* v = getVarPointer (name))
         return *v;
 
     return defaultReturnValue;
 }
 
-var* NamedValueSet::getVarPointer (const Identifier name) const noexcept
+var* NamedValueSet::getVarPointer (const Identifier& name) noexcept
 {
-    for (NamedValue* i = values; i != nullptr; i = i->nextListItem)
-        if (i->name == name)
-            return &(i->value);
+    for (auto& i : values)
+        if (i.name == name)
+            return &(i.value);
 
-    return nullptr;
+    return {};
 }
 
-#if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-bool NamedValueSet::set (const Identifier name, var&& newValue)
+const var* NamedValueSet::getVarPointer (const Identifier& name) const noexcept
 {
-    LinkedListPointer<NamedValue>* i = &values;
+    for (auto& i : values)
+        if (i.name == name)
+            return &(i.value);
 
-    while (i->get() != nullptr)
-    {
-        NamedValue* const v = i->get();
-
-        if (v->name == name)
-        {
-            if (v->value.equalsWithSameType (newValue))
-                return false;
-
-            v->value = static_cast <var&&> (newValue);
-            return true;
-        }
-
-        i = &(v->nextListItem);
-    }
-
-    i->insertNext (new NamedValue (name, static_cast <var&&> (newValue)));
-    return true;
+    return {};
 }
-#endif
 
-bool NamedValueSet::set (const Identifier name, const var& newValue)
+bool NamedValueSet::set (const Identifier& name, var&& newValue)
 {
-    LinkedListPointer<NamedValue>* i = &values;
-
-    while (i->get() != nullptr)
+    if (auto* v = getVarPointer (name))
     {
-        NamedValue* const v = i->get();
+        if (v->equalsWithSameType (newValue))
+            return false;
 
-        if (v->name == name)
-        {
-            if (v->value.equalsWithSameType (newValue))
-                return false;
-
-            v->value = newValue;
-            return true;
-        }
-
-        i = &(v->nextListItem);
+        *v = std::move (newValue);
+        return true;
     }
 
-    i->insertNext (new NamedValue (name, newValue));
+    values.add ({ name, std::move (newValue) });
     return true;
 }
 
-bool NamedValueSet::contains (const Identifier name) const
+bool NamedValueSet::set (const Identifier& name, const var& newValue)
+{
+    if (auto* v = getVarPointer (name))
+    {
+        if (v->equalsWithSameType (newValue))
+            return false;
+
+        *v = newValue;
+        return true;
+    }
+
+    values.add ({ name, newValue });
+    return true;
+}
+
+bool NamedValueSet::contains (const Identifier& name) const noexcept
 {
     return getVarPointer (name) != nullptr;
 }
 
-bool NamedValueSet::remove (const Identifier name)
+int NamedValueSet::indexOf (const Identifier& name) const noexcept
 {
-    LinkedListPointer<NamedValue>* i = &values;
+    auto numValues = values.size();
 
-    for (;;)
+    for (int i = 0; i < numValues; ++i)
+        if (values.getReference(i).name == name)
+            return i;
+
+    return -1;
+}
+
+bool NamedValueSet::remove (const Identifier& name)
+{
+    auto numValues = values.size();
+
+    for (int i = 0; i < numValues; ++i)
     {
-        NamedValue* const v = i->get();
-
-        if (v == nullptr)
-            break;
-
-        if (v->name == name)
+        if (values.getReference(i).name == name)
         {
-            delete i->removeNext();
+            values.remove (i);
             return true;
         }
-
-        i = &(v->nextListItem);
     }
 
     return false;
 }
 
-const Identifier NamedValueSet::getName (const int index) const
+Identifier NamedValueSet::getName (const int index) const noexcept
 {
-    const NamedValue* const v = values[index];
-    jassert (v != nullptr);
-    return v->name;
+    if (isPositiveAndBelow (index, values.size()))
+        return values.getReference (index).name;
+
+    jassertfalse;
+    return {};
 }
 
-const var& NamedValueSet::getValueAt (const int index) const
+const var& NamedValueSet::getValueAt (const int index) const noexcept
 {
-    const NamedValue* const v = values[index];
-    jassert (v != nullptr);
-    return v->value;
+    if (isPositiveAndBelow (index, values.size()))
+        return values.getReference (index).value;
+
+    jassertfalse;
+    return getNullVarRef();
+}
+
+var* NamedValueSet::getVarPointerAt (int index) noexcept
+{
+    if (isPositiveAndBelow (index, values.size()))
+        return &(values.getReference (index).value);
+
+    return {};
+}
+
+const var* NamedValueSet::getVarPointerAt (int index) const noexcept
+{
+    if (isPositiveAndBelow (index, values.size()))
+        return &(values.getReference (index).value);
+
+    return {};
 }
 
 void NamedValueSet::setFromXmlAttributes (const XmlElement& xml)
 {
-    clear();
-    LinkedListPointer<NamedValue>::Appender appender (values);
+    values.clearQuick();
 
-    const int numAtts = xml.getNumAttributes(); // xxx inefficient - should write an att iterator..
-
-    for (int i = 0; i < numAtts; ++i)
+    for (auto* att = xml.attributes.get(); att != nullptr; att = att->nextListItem)
     {
-        const String& name = xml.getAttributeName (i);
-        const String& value = xml.getAttributeValue (i);
-
-        if (name.startsWith ("base64:"))
+        if (att->name.toString().startsWith ("base64:"))
         {
             MemoryBlock mb;
 
-            if (mb.fromBase64Encoding (value))
+            if (mb.fromBase64Encoding (att->value))
             {
-                appender.append (new NamedValue (name.substring (7), var (mb)));
+                values.add ({ att->name.toString().substring (7), var (mb) });
                 continue;
             }
         }
 
-        appender.append (new NamedValue (name, var (value)));
+        values.add ({ att->name, var (att->value) });
     }
 }
 
 void NamedValueSet::copyToXmlAttributes (XmlElement& xml) const
 {
-    for (NamedValue* i = values; i != nullptr; i = i->nextListItem)
+    for (auto& i : values)
     {
-        if (const MemoryBlock* mb = i->value.getBinaryData())
+        if (auto* mb = i.value.getBinaryData())
         {
-            xml.setAttribute ("base64:" + i->name.toString(),
-                              mb->toBase64Encoding());
+            xml.setAttribute ("base64:" + i.name.toString(), mb->toBase64Encoding());
         }
         else
         {
             // These types can't be stored as XML!
-            jassert (! i->value.isObject());
-            jassert (! i->value.isMethod());
-            jassert (! i->value.isArray());
+            jassert (! i.value.isObject());
+            jassert (! i.value.isMethod());
+            jassert (! i.value.isArray());
 
-            xml.setAttribute (i->name.toString(),
-                              i->value.toString());
+            xml.setAttribute (i.name.toString(),
+                              i.value.toString());
         }
     }
 }
+
+} // namespace juce

@@ -2,29 +2,29 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_FONT_H_INCLUDED
-#define JUCE_FONT_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -35,8 +35,10 @@
     horizontal scale factor.
 
     @see Typeface
+
+    @tags{Graphics}
 */
-class JUCE_API  Font
+class JUCE_API  Font  final
 {
 public:
     //==============================================================================
@@ -95,10 +97,11 @@ public:
     */
     Font();
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
+    /** Move constructor */
     Font (Font&& other) noexcept;
+
+    /** Move assignment operator */
     Font& operator= (Font&& other) noexcept;
-   #endif
 
     /** Copies this font from another one. */
     Font& operator= (const Font& other) noexcept;
@@ -118,7 +121,7 @@ public:
         or Font::getDefaultMonospacedFontName(), which are not actual platform-specific font family names,
         but are generic font family names that are used to represent the various default fonts.
         If you need to know the exact typeface font family being used, you can call
-        Font::getTypeface()->getName(), which will give you the platform-specific font family.
+        Font::getTypefacePtr()->getName(), which will give you the platform-specific font family.
 
         If a suitable font isn't found on the machine, it'll just use a default instead.
     */
@@ -130,18 +133,18 @@ public:
 
         This may also be set to Font::getDefaultSansSerifFontName(), Font::getDefaultSerifFontName(),
         or Font::getDefaultMonospacedFontName(), which are not actual platform-specific font family names,
-        but are generic font familiy names that are used to represent the various default fonts.
+        but are generic font family names that are used to represent the various default fonts.
 
         If you need to know the exact typeface font family being used, you can call
-        Font::getTypeface()->getName(), which will give you the platform-specific font family.
+        Font::getTypefacePtr()->getName(), which will give you the platform-specific font family.
     */
-    const String& getTypefaceName() const noexcept;
+    String getTypefaceName() const noexcept;
 
     //==============================================================================
     /** Returns the font style of the typeface that this font uses.
         @see withTypefaceStyle, getAvailableStyles()
     */
-    const String& getTypefaceStyle() const noexcept;
+    String getTypefaceStyle() const noexcept;
 
     /** Changes the font style of the typeface.
         @see getAvailableStyles()
@@ -151,7 +154,7 @@ public:
     /** Returns a copy of this font with a new typeface style.
         @see getAvailableStyles()
     */
-    Font withTypefaceStyle (const String& newStyle) const;
+    [[nodiscard]] Font withTypefaceStyle (const String& newStyle) const;
 
     /** Returns a list of the styles that this font can use. */
     StringArray getAvailableStyles() const;
@@ -169,7 +172,7 @@ public:
     */
     static const String& getDefaultSansSerifFontName();
 
-    /** Returns a typeface font family that represents the default sans-serif font.
+    /** Returns a typeface font family that represents the default serif font.
 
         Note that this method just returns a generic placeholder string that means "the default
         serif font" - it's not the actual font family of this font.
@@ -178,7 +181,7 @@ public:
     */
     static const String& getDefaultSerifFontName();
 
-    /** Returns a typeface font family that represents the default sans-serif font.
+    /** Returns a typeface font family that represents the default monospaced font.
 
         Note that this method just returns a generic placeholder string that means "the default
         monospaced font" - it's not the actual font family of this font.
@@ -187,10 +190,10 @@ public:
     */
     static const String& getDefaultMonospacedFontName();
 
-    /** Returns a typeface font style that represents the default sans-serif font.
+    /** Returns a font style name that represents the default style.
 
         Note that this method just returns a generic placeholder string that means "the default
-        font style" - it's not the actual font style of this font.
+        font style" - it's not the actual name of the font style of any particular font.
 
         @see setTypefaceStyle
     */
@@ -201,10 +204,10 @@ public:
 
     //==============================================================================
     /** Returns a copy of this font with a new height. */
-    Font withHeight (float height) const;
+    [[nodiscard]] Font withHeight (float height) const;
 
     /** Returns a copy of this font with a new height, specified in points. */
-    Font withPointHeight (float heightInPoints) const;
+    [[nodiscard]] Font withPointHeight (float heightInPoints) const;
 
     /** Changes the font's height.
         @see getHeight, withHeight, setHeightWithoutChangingWidth
@@ -268,7 +271,7 @@ public:
         @param styleFlags     a bitwise-or'ed combination of values from the FontStyleFlags enum.
         @see FontStyleFlags, getStyleFlags
     */
-    Font withStyle (int styleFlags) const;
+    [[nodiscard]] Font withStyle (int styleFlags) const;
 
     /** Changes the font's style.
         @param newFlags     a bitwise-or'ed combination of values from the FontStyleFlags enum.
@@ -279,15 +282,19 @@ public:
     //==============================================================================
     /** Makes the font bold or non-bold. */
     void setBold (bool shouldBeBold);
-    /** Returns a copy of this font with the bold attribute set. */
-    Font boldened() const;
+
+    /** Returns a copy of this font with the bold attribute set.
+        If the font does not have a bold version, this will return the default font.
+     */
+    [[nodiscard]] Font boldened() const;
+
     /** Returns true if the font is bold. */
     bool isBold() const noexcept;
 
     /** Makes the font italic or non-italic. */
     void setItalic (bool shouldBeItalic);
     /** Returns a copy of this font with the italic attribute set. */
-    Font italicised() const;
+    [[nodiscard]] Font italicised() const;
     /** Returns true if the font is italic. */
     bool isItalic() const noexcept;
 
@@ -295,7 +302,6 @@ public:
     void setUnderline (bool shouldBeUnderlined);
     /** Returns true if the font is underlined. */
     bool isUnderlined() const noexcept;
-
 
     //==============================================================================
     /** Returns the font's horizontal scale.
@@ -311,13 +317,25 @@ public:
                             narrower, greater than 1.0 will be stretched out.
         @see getHorizontalScale
     */
-    Font withHorizontalScale (float scaleFactor) const;
+    [[nodiscard]] Font withHorizontalScale (float scaleFactor) const;
 
     /** Changes the font's horizontal scale factor.
         @param scaleFactor  a value of 1.0 is the normal scale, less than this will be
                             narrower, greater than 1.0 will be stretched out.
     */
     void setHorizontalScale (float scaleFactor);
+
+    /** Returns the minimum horizontal scale to which fonts may be squashed when trying to
+        create a layout.
+        @see setDefaultMinimumHorizontalScaleFactor
+    */
+    static float getDefaultMinimumHorizontalScaleFactor() noexcept;
+
+    /** Sets the minimum horizontal scale to which fonts may be squashed when trying to
+        create a text layout.
+        @see getDefaultMinimumHorizontalScaleFactor
+    */
+    static void setDefaultMinimumHorizontalScaleFactor (float newMinimumScaleFactor) noexcept;
 
     /** Returns the font's kerning.
 
@@ -335,7 +353,7 @@ public:
                                 normal spacing, positive values spread the letters out,
                                 negative values make them closer together.
     */
-    Font withExtraKerningFactor (float extraKerning) const;
+    [[nodiscard]] Font withExtraKerningFactor (float extraKerning) const;
 
     /** Changes the font's kerning.
         @param extraKerning     a multiple of the font's height that will be added
@@ -374,15 +392,21 @@ public:
         An extra x offset is added at the end of the run, to indicate where the right hand
         edge of the last character is.
     */
-    void getGlyphPositions (const String& text, Array <int>& glyphs, Array <float>& xOffsets) const;
+    void getGlyphPositions (const String& text, Array<int>& glyphs, Array<float>& xOffsets) const;
 
     //==============================================================================
+   #ifndef DOXYGEN
     /** Returns the typeface used by this font.
 
         Note that the object returned may go out of scope if this font is deleted
         or has its style changed.
     */
+    [[deprecated ("This method is unsafe, use getTypefacePtr() instead.")]]
     Typeface* getTypeface() const;
+   #endif
+
+    /** Returns the typeface used by this font. */
+    Typeface::Ptr getTypefacePtr() const;
 
     /** Creates an array of Font objects to represent all the fonts on the system.
 
@@ -445,16 +469,20 @@ public:
     */
     static Font fromString (const String& fontDescription);
 
-
 private:
     //==============================================================================
-    class SharedFontInternal;
-    ReferenceCountedObjectPtr <SharedFontInternal> font;
+    static bool compare (const Font&, const Font&) noexcept;
+
     void dupeInternalIfShared();
     void checkTypefaceSuitability();
     float getHeightToPointsFactor() const;
 
+    friend struct GraphicsFontHelpers;
+
+    class SharedFontInternal;
+    ReferenceCountedObjectPtr<SharedFontInternal> font;
+
     JUCE_LEAK_DETECTOR (Font)
 };
 
-#endif   // JUCE_FONT_H_INCLUDED
+} // namespace juce

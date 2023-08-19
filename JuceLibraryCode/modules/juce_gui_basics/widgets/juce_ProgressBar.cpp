@@ -2,35 +2,38 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission is granted to use this software under the terms of either:
-   a) the GPL v2 (or any later version)
-   b) the Affero GPL v3
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   Details of these licenses can be found at: www.gnu.org/licenses
+   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
+   Agreement and JUCE Privacy Policy.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-7-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-   ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.juce.com for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-ProgressBar::ProgressBar (double& progress_)
-   : progress (progress_),
-     displayPercentage (true),
-     lastCallbackTime (0)
+namespace juce
 {
-    currentValue = jlimit (0.0, 1.0, progress);
+
+ProgressBar::ProgressBar (double& progress_, std::optional<Style> style_)
+   : progress { progress_ },
+     style { style_ }
+{
 }
 
-ProgressBar::~ProgressBar()
+ProgressBar::ProgressBar (double& progress_)
+   : progress { progress_ }
 {
 }
 
@@ -47,14 +50,26 @@ void ProgressBar::setTextToDisplay (const String& text)
     displayedMessage = text;
 }
 
+void ProgressBar::setStyle (std::optional<Style> newStyle)
+{
+    style = newStyle;
+    repaint();
+}
+
+ProgressBar::Style ProgressBar::getResolvedStyle() const
+{
+    return style.value_or (getLookAndFeel().getDefaultProgressBarStyle (*this));
+}
+
 void ProgressBar::lookAndFeelChanged()
 {
-    setOpaque (findColour (backgroundColourId).isOpaque());
+    setOpaque (getLookAndFeel().isProgressBarOpaque (*this));
 }
 
 void ProgressBar::colourChanged()
 {
     lookAndFeelChanged();
+    repaint();
 }
 
 void ProgressBar::paint (Graphics& g)
@@ -71,9 +86,11 @@ void ProgressBar::paint (Graphics& g)
         text = displayedMessage;
     }
 
-    getLookAndFeel().drawProgressBar (g, *this,
-                                      getWidth(), getHeight(),
-                                      currentValue, text);
+    const auto w = getWidth();
+    const auto h = getHeight();
+    const auto v = currentValue;
+
+    getLookAndFeel().drawProgressBar (g, *this, w, h, v, text);
 }
 
 void ProgressBar::visibilityChanged()
@@ -92,7 +109,7 @@ void ProgressBar::timerCallback()
     const int timeSinceLastCallback = (int) (now - lastCallbackTime);
     lastCallbackTime = now;
 
-    if (currentValue != newProgress
+    if (! approximatelyEqual (currentValue, newProgress)
          || newProgress < 0 || newProgress >= 1.0
          || currentMessage != displayedMessage)
     {
@@ -107,5 +124,57 @@ void ProgressBar::timerCallback()
         currentValue = newProgress;
         currentMessage = displayedMessage;
         repaint();
+
+        if (auto* handler = getAccessibilityHandler())
+            handler->notifyAccessibilityEvent (AccessibilityEvent::valueChanged);
     }
 }
+
+//==============================================================================
+std::unique_ptr<AccessibilityHandler> ProgressBar::createAccessibilityHandler()
+{
+    class ProgressBarAccessibilityHandler  : public AccessibilityHandler
+    {
+    public:
+        explicit ProgressBarAccessibilityHandler (ProgressBar& progressBarToWrap)
+            : AccessibilityHandler (progressBarToWrap,
+                                    AccessibilityRole::progressBar,
+                                    AccessibilityActions{},
+                                    AccessibilityHandler::Interfaces { std::make_unique<ValueInterface> (progressBarToWrap) }),
+              progressBar (progressBarToWrap)
+        {
+        }
+
+        String getHelp() const override   { return progressBar.getTooltip(); }
+
+    private:
+        class ValueInterface  : public AccessibilityRangedNumericValueInterface
+        {
+        public:
+            explicit ValueInterface (ProgressBar& progressBarToWrap)
+                : progressBar (progressBarToWrap)
+            {
+            }
+
+            bool isReadOnly() const override                { return true; }
+            void setValue (double) override                 { jassertfalse; }
+            double getCurrentValue() const override         { return progressBar.progress; }
+            AccessibleValueRange getRange() const override  { return { { 0.0, 1.0 }, 0.001 }; }
+
+        private:
+            ProgressBar& progressBar;
+
+            //==============================================================================
+            JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ValueInterface)
+        };
+
+        ProgressBar& progressBar;
+
+        //==============================================================================
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProgressBarAccessibilityHandler)
+    };
+
+    return std::make_unique<ProgressBarAccessibilityHandler> (*this);
+}
+
+} // namespace juce

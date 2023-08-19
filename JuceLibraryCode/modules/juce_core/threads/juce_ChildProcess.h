@@ -1,34 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the juce_core module of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2022 - Raw Material Software Limited
 
-   Permission to use, copy, modify, and/or distribute this software for any purpose with
-   or without fee is hereby granted, provided that the above copyright notice and this
-   permission notice appear in all copies.
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD
-   TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN
-   NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-   DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
-   IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   ------------------------------------------------------------------------------
-
-   NOTE! This permissive ISC license applies ONLY to files within the juce_core module!
-   All other JUCE modules are covered by a dual GPL/commercial license, so if you are
-   using any other modules, be sure to check that you also comply with their license.
-
-   For more details, visit www.juce.com
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef JUCE_CHILDPROCESS_H_INCLUDED
-#define JUCE_CHILDPROCESS_H_INCLUDED
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -36,6 +29,8 @@
 
     This class lets you launch an executable, and read its output. You can also
     use it to check whether the child process has finished.
+
+    @tags{Core}
 */
 class JUCE_API  ChildProcess
 {
@@ -97,6 +92,9 @@ public:
     /** Blocks until the process is no longer running. */
     bool waitForProcessToFinish (int timeoutMs) const;
 
+    /** If the process has finished, this returns its exit code. */
+    uint32 getExitCode() const;
+
     /** Attempts to kill the child process.
         Returns true if it succeeded. Trying to read from the process after calling this may
         result in undefined behaviour.
@@ -106,11 +104,9 @@ public:
 private:
     //==============================================================================
     class ActiveProcess;
-    friend struct ContainerDeletePolicy<ActiveProcess>;
-    ScopedPointer<ActiveProcess> activeProcess;
+    std::unique_ptr<ActiveProcess> activeProcess;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChildProcess)
 };
 
-
-#endif   // JUCE_CHILDPROCESS_H_INCLUDED
+} // namespace juce
